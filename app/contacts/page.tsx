@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Sidebar from "@/components/Sidebar";
 
 type Contact = {
   id: string; name: string; phone: string; status: string;
@@ -11,7 +10,7 @@ type Contact = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  "Drip Active": "#3b82f6",
+  "Drip Active": "#00e5ff",
   "The Pool": "#a855f7",
   "Replied - Pivot Call Needed - HOT": "#f97316",
   "Deal sent- Discovery call needed": "#ec4899",
@@ -20,9 +19,26 @@ const STATUS_COLORS: Record<string, string> = {
   "60-Day Rest": "#6b7280",
 };
 
+const STATUS_SHORT: Record<string, string> = {
+  "Drip Active": "Drip Active",
+  "The Pool": "The Pool",
+  "Replied - Pivot Call Needed - HOT": "Hot 🔥",
+  "Deal sent- Discovery call needed": "Deal",
+  "No Deal - Auto Reply": "No Deal",
+  "Underwriting": "Underwriting",
+  "60-Day Rest": "60-Day Rest",
+};
+
 const ALL_STATUSES = [
   "Drip Active", "The Pool", "Replied - Pivot Call Needed - HOT",
   "Deal sent- Discovery call needed", "No Deal - Auto Reply", "Underwriting", "60-Day Rest",
+];
+
+const FILTER_TABS = [
+  { label: "All", value: "", icon: "⊞" },
+  { label: "New", value: "New", icon: "✦" },
+  { label: "Drip Active", value: "Drip Active", icon: "◎" },
+  { label: "Hot Leads", value: "Replied - Pivot Call Needed - HOT", icon: "🔥" },
 ];
 
 export default function ContactsPage() {
@@ -33,17 +49,13 @@ export default function ContactsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active" });
   const [saving, setSaving] = useState(false);
-  const router = useRouter();
 
-  useEffect(() => {
-    loadContacts();
-  }, []);
+  useEffect(() => { loadContacts(); }, []);
 
   async function loadContacts() {
     setLoading(true);
     const res = await fetch("/api/contacts");
-    const data = await res.json();
-    setContacts(data);
+    setContacts(await res.json());
     setLoading(false);
   }
 
@@ -70,11 +82,6 @@ export default function ContactsPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  }
-
   const filtered = contacts.filter((c) => {
     const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
     const matchStatus = !filterStatus || c.status === filterStatus;
@@ -82,81 +89,113 @@ export default function ContactsPage() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f0f0f" }}>
-      <nav style={{ background: "#1a1a1a", borderBottom: "1px solid #2a2a2a", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontWeight: 700, fontSize: 16 }}>Flip CRM</span>
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <Link href="/dashboard" style={{ color: "#888", fontSize: 14 }}>Dashboard</Link>
-          <Link href="/contacts" style={{ color: "#e5e5e5", fontSize: 14 }}>Contacts</Link>
-          <Link href="/scripts" style={{ color: "#888", fontSize: 14 }}>Scripts</Link>
-          <button onClick={logout} style={{ background: "none", border: "1px solid #333", color: "#888", borderRadius: 6, padding: "5px 12px", fontSize: 13 }}>Logout</button>
-        </div>
-      </nav>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+      <Sidebar />
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
+      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Contacts ({filtered.length})</h1>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Contacts</h1>
+            <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>{filtered.length} agents</p>
+          </div>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            style={{ background: "#fff", color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 600, fontSize: 14 }}
+            style={{
+              background: "#1a1a1a", color: "#fff", border: "none",
+              borderRadius: 10, padding: "11px 22px", fontWeight: 600,
+              fontSize: 14, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            }}
           >
             + Add Contact
           </button>
         </div>
 
-        {/* Add Contact Form */}
+        {/* Add Contact Modal */}
         {showAdd && (
-          <form onSubmit={addContact} style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: 24, marginBottom: 24 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>New Contact</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <input placeholder="Full Name *" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} required />
-              <input placeholder="Phone *" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} required />
-              <input placeholder="Email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
-              <input placeholder="Brokerage" value={newContact.brokerage} onChange={(e) => setNewContact({ ...newContact, brokerage: e.target.value })} />
-              <input placeholder="Area" value={newContact.area} onChange={(e) => setNewContact({ ...newContact, area: e.target.value })} />
-              <select value={newContact.status} onChange={(e) => setNewContact({ ...newContact, status: e.target.value })}>
-                {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
+          }}>
+            <div style={{ background: "#1a1a1a", borderRadius: 16, padding: 32, width: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 20 }}>New Contact</h2>
+              <form onSubmit={addContact}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <input placeholder="Full Name *" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} required />
+                  <input placeholder="Phone *" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} required />
+                  <input placeholder="Email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
+                  <input placeholder="Brokerage" value={newContact.brokerage} onChange={(e) => setNewContact({ ...newContact, brokerage: e.target.value })} />
+                  <input placeholder="Area" value={newContact.area} onChange={(e) => setNewContact({ ...newContact, area: e.target.value })} />
+                  <select value={newContact.status} onChange={(e) => setNewContact({ ...newContact, status: e.target.value })}>
+                    {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button type="submit" disabled={saving} style={{ background: "#00e5ff", color: "#000", border: "none", borderRadius: 8, padding: "10px 22px", fontWeight: 700, fontSize: 14, flex: 1 }}>
+                    {saving ? "Saving..." : "Save Contact"}
+                  </button>
+                  <button type="button" onClick={() => setShowAdd(false)} style={{ background: "#2a2a2a", color: "#888", border: "none", borderRadius: 8, padding: "10px 22px", fontSize: 14 }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <button type="submit" disabled={saving} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 6, padding: "8px 20px", fontWeight: 600, fontSize: 14 }}>
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button type="button" onClick={() => setShowAdd(false)} style={{ background: "none", border: "1px solid #333", color: "#888", borderRadius: 6, padding: "8px 20px", fontSize: 14 }}>
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
         )}
 
-        {/* Filters */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-          <input placeholder="Search name or phone..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ maxWidth: 220 }}>
-            <option value="">All Statuses</option>
-            {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+        {/* Search & Filters */}
+        <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ffffff", marginBottom: 14 }}>Search & Filters</h2>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              placeholder="Search name or phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ maxWidth: 240 }}
+            />
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setFilterStatus(tab.value)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "9px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500,
+                  border: "none", cursor: "pointer",
+                  background: filterStatus === tab.value ? "#ffffff" : "#2a2a2a",
+                  color: filterStatus === tab.value ? "#111827" : "#888",
+                }}
+              >
+                <span>{tab.icon}</span> {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Table */}
-        <div style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
           {loading ? (
-            <p style={{ padding: 24, color: "#888", fontSize: 14 }}>Loading contacts...</p>
+            <p style={{ padding: 24, color: "#555", fontSize: 14 }}>Loading contacts...</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
-                <tr style={{ background: "#141414", color: "#888", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {["Name", "Phone", "Status", "Step", "Brokerage", "Area", "Next Date", "Last Reply"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "12px 16px", fontWeight: 500 }}>{h}</th>
+                <tr style={{ background: "#141414" }}>
+                  <th style={{ width: 36, padding: "14px 16px" }}>
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: "#00e5ff" }} />
+                  </th>
+                  {["Name", "Phone", "Status", "Campaign Stage", ""].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "14px 16px", color: "#555", fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
                   <tr key={c.id} style={{ borderTop: "1px solid #222" }}>
-                    <td style={{ padding: "12px 16px", fontWeight: 500 }}>{c.name}</td>
-                    <td style={{ padding: "12px 16px", color: "#888" }}>{c.phone}</td>
-                    <td style={{ padding: "12px 16px" }}>
+                    <td style={{ padding: "14px 16px" }}>
+                      <input type="checkbox" style={{ width: 16, height: 16, accentColor: "#00e5ff" }} />
+                    </td>
+                    <td style={{ padding: "14px 16px", color: "#fff", fontWeight: 500 }}>{c.name}</td>
+                    <td style={{ padding: "14px 16px", color: "#666" }}>{c.phone}</td>
+                    <td style={{ padding: "14px 16px" }}>
                       <select
                         value={c.status}
                         onChange={(e) => updateStatus(c.id, e.target.value)}
@@ -164,25 +203,18 @@ export default function ContactsPage() {
                           background: (STATUS_COLORS[c.status] ?? "#444") + "22",
                           border: "1px solid " + (STATUS_COLORS[c.status] ?? "#444") + "55",
                           color: STATUS_COLORS[c.status] ?? "#888",
-                          borderRadius: 4,
-                          padding: "3px 8px",
-                          fontSize: 12,
-                          width: "auto",
+                          borderRadius: 6, padding: "4px 10px",
+                          fontSize: 12, fontWeight: 600, width: "auto",
                         }}
                       >
-                        {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_SHORT[s] ?? s}</option>)}
                       </select>
                     </td>
-                    <td style={{ padding: "12px 16px", color: "#888", fontSize: 13 }}>
+                    <td style={{ padding: "14px 16px", color: "#666", fontSize: 13 }}>
                       {c.status === "The Pool" ? `Pool ${c.poolStep}` : `Drip ${c.dripStep}`}
                     </td>
-                    <td style={{ padding: "12px 16px", color: "#888" }}>{c.brokerage}</td>
-                    <td style={{ padding: "12px 16px", color: "#888" }}>{c.area}</td>
-                    <td style={{ padding: "12px 16px", color: c.date && c.date <= new Date().toISOString().split("T")[0] ? "#f97316" : "#888", fontSize: 13 }}>
-                      {c.date ?? "—"}
-                    </td>
-                    <td style={{ padding: "12px 16px", color: "#888", fontSize: 12, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {c.lastReply || "—"}
+                    <td style={{ padding: "14px 16px" }}>
+                      <button style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer", letterSpacing: 2 }}>•••</button>
                     </td>
                   </tr>
                 ))}
