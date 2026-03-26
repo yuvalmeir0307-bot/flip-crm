@@ -214,7 +214,7 @@ export default function ContactsPage() {
                       </select>
                     </td>
                     <td style={{ padding: "14px 16px", color: "#666", fontSize: 13 }}>
-                      {c.status === "The Pool" ? `Pool ${c.poolStep}` : `Drip ${c.dripStep}`}
+                      {c.status === "The Pool" ? `Pool ${c.poolStep}` : c.status === "Drip Active" ? `Drip ${c.dripStep}` : "—"}
                     </td>
                     <td style={{ padding: "14px 16px" }}>
                       <button style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer", letterSpacing: 2 }}>•••</button>

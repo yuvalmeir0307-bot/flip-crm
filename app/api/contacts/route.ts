@@ -25,7 +25,14 @@ export async function PATCH(req: NextRequest) {
 
   // Map flat fields back to Notion property format
   const notionProps: Record<string, unknown> = {};
-  if (properties.status) notionProps["Status"] = { select: { name: properties.status } };
+  if (properties.status) {
+    notionProps["Status"] = { select: { name: properties.status } };
+    // When manually setting to HOT, reset drip/pool steps so no messages fire
+    if (properties.status === "Replied - Pivot Call Needed - HOT") {
+      notionProps["Drip step"] = { number: 0 };
+      notionProps["Pool step"] = { number: 0 };
+    }
+  }
   if (properties.phone) notionProps["Phone"] = { phone_number: properties.phone };
   if (properties.email) notionProps["Email"] = { email: properties.email };
   if (properties.brokerage) notionProps["Brokerage"] = { rich_text: [{ text: { content: properties.brokerage } }] };
