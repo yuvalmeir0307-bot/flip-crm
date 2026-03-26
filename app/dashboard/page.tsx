@@ -12,7 +12,7 @@ const STATUS_COLORS: Record<string, string> = {
   "Drip Active": "#00e5ff",
   "The Pool": "#a855f7",
   "Replied - Pivot Call Needed - HOT": "#f97316",
-  "Deal sent- Discovery call needed": "#ec4899",
+  "Potential Deal": "#ec4899",
   "No Deal - Auto Reply": "#ef4444",
   "Underwriting": "#22c55e",
   "60-Day Rest": "#6b7280",
@@ -22,7 +22,7 @@ const STATUS_SHORT: Record<string, string> = {
   "Drip Active": "Drip Active",
   "The Pool": "The Pool",
   "Replied - Pivot Call Needed - HOT": "Hot 🔥",
-  "Deal sent- Discovery call needed": "Deal",
+  "Potential Deal": "Deal",
   "No Deal - Auto Reply": "No Deal",
   "Underwriting": "Underwriting",
   "60-Day Rest": "60-Day Rest",
@@ -84,7 +84,7 @@ export default function Dashboard() {
     drip: contacts.filter((c) => c.status === "Drip Active").length,
     pool: contacts.filter((c) => c.status === "The Pool").length,
     hot: contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT").length,
-    deal: contacts.filter((c) => c.status === "Deal sent- Discovery call needed").length,
+    deal: contacts.filter((c) => c.status === "Potential Deal").length,
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -109,7 +109,7 @@ export default function Dashboard() {
     { label: "Drip Active", value: counts.drip, color: "#00e5ff", spark: buildSeries(6, (c) => c.status === "Drip Active") },
     { label: "In The Pool", value: counts.pool, color: "#a855f7", spark: buildSeries(6, (c) => c.status === "The Pool") },
     { label: "Hot Leads", value: counts.hot, color: "#f97316", spark: buildSeries(6, (c) => c.status === "Replied - Pivot Call Needed - HOT") },
-    { label: "Deals", value: counts.deal, color: "#22c55e", spark: buildSeries(6, (c) => c.status === "Deal sent- Discovery call needed") },
+    { label: "Deals", value: counts.deal, color: "#22c55e", spark: buildSeries(6, (c) => c.status === "Potential Deal") },
   ];
 
   // Activity charts: per-day count of contacts touched (based on lastContact date)

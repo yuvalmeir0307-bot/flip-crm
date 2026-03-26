@@ -150,7 +150,7 @@ export default function Insights() {
   // Replied = contacts with a lastReply value OR status indicates a reply
   const repliedStatuses = [
     "Replied - Pivot Call Needed - HOT",
-    "Deal sent- Discovery call needed",
+    "Potential Deal",
     "No Deal - Auto Reply",
     "Underwriting",
   ];
@@ -164,7 +164,7 @@ export default function Insights() {
   const engagedCalls = contacts.filter(
     (c) =>
       c.status === "Replied - Pivot Call Needed - HOT" ||
-      c.status === "Deal sent- Discovery call needed"
+      c.status === "Potential Deal"
   ).length;
 
   // Converted to pool = in The Pool or has pool steps

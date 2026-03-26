@@ -328,9 +328,9 @@ export default function SettingsPage() {
                       onClick={() => openFlowModal("No Deal", "#ef4444", c => c.status === "No Deal - Auto Reply")} />
                   </FlowBranch>
                   <FlowBranch label="DEAL" color="#22c55e">
-                    <FlowNode label="Deal Sent" sub="SMS alert + Discovery Call" color="#22c55e" active last
-                      count={contacts.filter(c => c.status === "Deal sent- Discovery call needed").length}
-                      onClick={() => openFlowModal("Deal Sent", "#22c55e", c => c.status === "Deal sent- Discovery call needed")} />
+                    <FlowNode label="Potential Deal" sub="Follow up → Discovery Call" color="#10b981" active last
+                      count={contacts.filter(c => c.status === "Potential Deal").length}
+                      onClick={() => openFlowModal("Deal Sent", "#22c55e", c => c.status === "Potential Deal")} />
                   </FlowBranch>
                 </div>
               </div>
@@ -360,8 +360,8 @@ export default function SettingsPage() {
                   count={contacts.filter(c => c.status === "The Pool" && c.lastReply.length > 0).length}
                   onClick={() => openFlowModal("Pool Replies", "#facc15", c => c.status === "The Pool" && c.lastReply.length > 0)} />
                 <FlowNode label="Deal Lead Received" sub="Call back immediately → Discovery Call" color="#22c55e" active last
-                  count={contacts.filter(c => c.status === "Deal sent- Discovery call needed").length}
-                  onClick={() => openFlowModal("Deal Leads", "#22c55e", c => c.status === "Deal sent- Discovery call needed")} />
+                  count={contacts.filter(c => c.status === "Potential Deal").length}
+                  onClick={() => openFlowModal("Deal Leads", "#22c55e", c => c.status === "Potential Deal")} />
               </div>
             </div>
 
@@ -371,8 +371,8 @@ export default function SettingsPage() {
               <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 24, textAlign: "center" }}>From discovery to close</p>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <FlowNode label="Discovery Call" sub="Get address, ARV, repair estimate" color="#ec4899" active
-                  count={contacts.filter(c => c.status === "Deal sent- Discovery call needed").length}
-                  onClick={() => openFlowModal("Discovery Call", "#ec4899", c => c.status === "Deal sent- Discovery call needed")} />
+                  count={contacts.filter(c => c.status === "Potential Deal").length}
+                  onClick={() => openFlowModal("Discovery Call", "#ec4899", c => c.status === "Potential Deal")} />
                 <FlowNode label="Run Numbers" sub="Purchase + Renovation (x1.3) + Timeline" color="#facc15"
                   count={contacts.filter(c => c.status === "Underwriting").length}
                   onClick={() => openFlowModal("Underwriting", "#facc15", c => c.status === "Underwriting")} />

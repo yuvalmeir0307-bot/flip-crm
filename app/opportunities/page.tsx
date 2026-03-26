@@ -241,15 +241,6 @@ function DealCard({ contact, onSave, onStatusChange }: {
             }}>
               Edit
             </button>
-            <button
-              onClick={() => onStatusChange(contact.id, "Deal sent- Discovery call needed")}
-              style={{
-                background: "#ec489922", color: "#f472b6", border: "1px solid #ec489944",
-                borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              Send Deal
-            </button>
           </>
         )}
       </div>
