@@ -42,6 +42,9 @@ export async function PATCH(req: NextRequest) {
   if (properties.date) notionProps["Date"] = { date: { start: properties.date } };
   if (properties.offerDate) notionProps["Offer Date"] = { date: { start: properties.offerDate } };
   if (properties.closeDate) notionProps["Close Date"] = { date: { start: properties.closeDate } };
+  if (properties.notes !== undefined) notionProps["Notes"] = { rich_text: [{ text: { content: properties.notes } }] };
+  if (properties.warmth) notionProps["Warmth"] = { select: { name: properties.warmth } };
+  if (properties.followUpDate) notionProps["Follow Up Date"] = { date: { start: properties.followUpDate } };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });

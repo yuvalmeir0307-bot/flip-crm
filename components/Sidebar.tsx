@@ -43,6 +43,16 @@ function IconChart({ color }: { color: string }) {
   );
 }
 
+function IconBriefcase({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="5" width="14" height="9" rx="2" stroke={color} strokeWidth="1.5" />
+      <path d="M5 5V4a3 3 0 016 0v1" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="1" y1="9" x2="15" y2="9" stroke={color} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function IconGear({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
@@ -74,6 +84,7 @@ function IconClose() {
 const NAV = [
   { href: "/dashboard", label: "Overview", Icon: IconGrid },
   { href: "/contacts", label: "Contacts", Icon: IconUser },
+  { href: "/opportunities", label: "Opportunities", Icon: IconBriefcase },
   { href: "/scripts", label: "Scripts", Icon: IconDoc },
   { href: "/insights", label: "Insights", Icon: IconChart },
   { href: "/settings", label: "Settings", Icon: IconGear },

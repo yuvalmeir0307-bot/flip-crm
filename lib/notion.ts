@@ -221,5 +221,8 @@ export function extractContactProps(page: Record<string, unknown>) {
     verified: props.Verified?.checkbox ?? false,
     offerDate: props["Offer Date"]?.date?.start ?? null,
     closeDate: props["Close Date"]?.date?.start ?? null,
+    notes: props.Notes?.rich_text?.[0]?.plain_text ?? "",
+    warmth: props.Warmth?.select?.name ?? "",
+    followUpDate: props["Follow Up Date"]?.date?.start ?? null,
   };
 }
