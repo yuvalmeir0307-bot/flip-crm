@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveContacts, updateContact, extractContactProps } from "@/lib/notion";
+import { getActiveContacts, updateContact, extractContactProps, createRunLog } from "@/lib/notion";
 import { sendSMS, getSender, getSenderName } from "@/lib/openphone";
 import {
   getDripScript,
@@ -65,6 +65,18 @@ export async function GET(req: NextRequest) {
     logs.push(`Sending to ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
 
     const result = await sendSMS(contact.phone, message, senderPhone);
+
+    // Log the run
+    await createRunLog({
+      date: new Date().toISOString(),
+      type: isPool ? "Pool" : "Drip",
+      contactName: contact.name,
+      phone: contact.phone,
+      step: isPool ? `Pool ${currentStep}` : `Drip ${currentStep}`,
+      status: result.ok ? "success" : "failed",
+      message: message.slice(0, 200),
+      error: result.ok ? "" : (result.error ?? "Unknown"),
+    });
 
     if (result.ok) {
       const updateProps: Record<string, unknown> = {

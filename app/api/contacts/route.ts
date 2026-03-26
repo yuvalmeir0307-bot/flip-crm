@@ -33,6 +33,8 @@ export async function PATCH(req: NextRequest) {
   if (properties.dripStep !== undefined) notionProps["Drip step"] = { number: properties.dripStep };
   if (properties.poolStep !== undefined) notionProps["Pool step"] = { number: properties.poolStep };
   if (properties.date) notionProps["Date"] = { date: { start: properties.date } };
+  if (properties.offerDate) notionProps["Offer Date"] = { date: { start: properties.offerDate } };
+  if (properties.closeDate) notionProps["Close Date"] = { date: { start: properties.closeDate } };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });

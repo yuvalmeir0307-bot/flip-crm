@@ -52,6 +52,16 @@ export async function updateScriptMessage(id: string, message: string): Promise<
   });
 }
 
+export async function updateScriptFields(id: string, fields: { message?: string; delay?: number }): Promise<void> {
+  const props: Record<string, unknown> = {};
+  if (fields.message !== undefined) props.Message = { rich_text: [{ text: { content: fields.message } }] };
+  if (fields.delay !== undefined) props.Delay = { number: fields.delay };
+  await notion.pages.update({
+    page_id: id,
+    properties: props,
+  } as Parameters<typeof notion.pages.update>[0]);
+}
+
 export async function deleteScript(id: string): Promise<void> {
   await notion.pages.update({
     page_id: id,

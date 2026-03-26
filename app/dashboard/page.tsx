@@ -86,17 +86,45 @@ export default function Dashboard() {
     (c) => (c.status === "Drip Active" || c.status === "The Pool") && (!c.date || c.date <= today)
   );
 
+  // Build 7-day rolling series from real contact dates
+  function buildSeries(days: number, filterFn?: (c: Contact) => boolean) {
+    const today = new Date();
+    return Array.from({ length: days }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (days - 1 - i));
+      const dateStr = d.toISOString().split("T")[0];
+      const pool = filterFn ? contacts.filter(filterFn) : contacts;
+      return pool.filter((c) => c.date && c.date <= dateStr).length;
+    });
+  }
+
   const stats = [
-    { label: "Total Contacts", value: counts.total, color: "#ffffff", spark: [2, 3, 3, 4, 4, 4] },
-    { label: "Drip Active", value: counts.drip, color: "#00e5ff", spark: [1, 2, 3, 2, 3, 3] },
-    { label: "In The Pool", value: counts.pool, color: "#a855f7", spark: [0, 0, 1, 1, 1, 1] },
-    { label: "Hot Leads", value: counts.hot, color: "#f97316", spark: [0, 0, 0, 0, 0, 0] },
-    { label: "Deals", value: counts.deal, color: "#22c55e", spark: [0, 0, 0, 0, 0, 0] },
+    { label: "Total Contacts", value: counts.total, color: "#ffffff", spark: buildSeries(6) },
+    { label: "Drip Active", value: counts.drip, color: "#00e5ff", spark: buildSeries(6, (c) => c.status === "Drip Active") },
+    { label: "In The Pool", value: counts.pool, color: "#a855f7", spark: buildSeries(6, (c) => c.status === "The Pool") },
+    { label: "Hot Leads", value: counts.hot, color: "#f97316", spark: buildSeries(6, (c) => c.status === "Replied - Pivot Call Needed - HOT") },
+    { label: "Deals", value: counts.deal, color: "#22c55e", spark: buildSeries(6, (c) => c.status === "Deal sent- Discovery call needed") },
   ];
 
-  // Build activity data for chart (drip vs pool over mock weekly points)
-  const dripPoints = [0, 1, 1, 2, 2, 3, counts.drip];
-  const poolPoints = [0, 0, 0, 1, 1, 1, counts.pool];
+  // Activity charts: per-day count of contacts touched (based on lastContact date)
+  function buildActivitySeries(days: number, filterFn: (c: Contact) => boolean) {
+    const today = new Date();
+    return Array.from({ length: days }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (days - 1 - i));
+      const dateStr = d.toISOString().split("T")[0];
+      return contacts.filter(filterFn).filter(
+        (c) => (c.lastContact ?? c.date ?? "").startsWith(dateStr)
+      ).length;
+    });
+  }
+
+  const dripPoints = buildActivitySeries(7, (c) => c.status === "Drip Active");
+  const poolPoints = buildActivitySeries(7, (c) => c.status === "The Pool");
+
+  // If all zeros (no activity yet), fall back to cumulative so graph isn't empty
+  const dripFinal = dripPoints.some((v) => v > 0) ? dripPoints : buildSeries(7, (c) => c.status === "Drip Active");
+  const poolFinal = poolPoints.some((v) => v > 0) ? poolPoints : buildSeries(7, (c) => c.status === "The Pool");
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
@@ -165,8 +193,8 @@ export default function Dashboard() {
                   <stop offset="100%" stopColor="#00e5ff" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <polygon points={`0,80 ${dripPoints.map((v, i) => `${i * (300 / (dripPoints.length - 1))},${80 - (v / Math.max(...dripPoints, 1)) * 70}`).join(" ")} 300,80`} fill="url(#gradTeal)" />
-              <polyline points={dripPoints.map((v, i) => `${i * (300 / (dripPoints.length - 1))},${80 - (v / Math.max(...dripPoints, 1)) * 70}`).join(" ")} fill="none" stroke="#00e5ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polygon points={`0,80 ${dripFinal.map((v, i) => `${i * (300 / (dripFinal.length - 1))},${80 - (v / Math.max(...dripFinal, 1)) * 70}`).join(" ")} 300,80`} fill="url(#gradTeal)" />
+              <polyline points={dripFinal.map((v, i) => `${i * (300 / (dripFinal.length - 1))},${80 - (v / Math.max(...dripFinal, 1)) * 70}`).join(" ")} fill="none" stroke="#00e5ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
               {["7d ago", "6d", "5d", "4d", "3d", "2d", "Today"].map((d) => (
@@ -191,8 +219,8 @@ export default function Dashboard() {
                   <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <polygon points={`0,80 ${poolPoints.map((v, i) => `${i * (300 / (poolPoints.length - 1))},${80 - (v / Math.max(...poolPoints, 1)) * 70}`).join(" ")} 300,80`} fill="url(#gradPurple)" />
-              <polyline points={poolPoints.map((v, i) => `${i * (300 / (poolPoints.length - 1))},${80 - (v / Math.max(...poolPoints, 1)) * 70}`).join(" ")} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polygon points={`0,80 ${poolFinal.map((v, i) => `${i * (300 / (poolFinal.length - 1))},${80 - (v / Math.max(...poolFinal, 1)) * 70}`).join(" ")} 300,80`} fill="url(#gradPurple)" />
+              <polyline points={poolFinal.map((v, i) => `${i * (300 / (poolFinal.length - 1))},${80 - (v / Math.max(...poolFinal, 1)) * 70}`).join(" ")} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
               {["7d ago", "6d", "5d", "4d", "3d", "2d", "Today"].map((d) => (

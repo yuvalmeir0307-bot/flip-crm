@@ -71,6 +71,126 @@ export async function createContact(data: {
   });
 }
 
+// ── Activity Log ─────────────────────────────────────────────────────────────
+const ACTIVITY_DB_ID = process.env.NOTION_ACTIVITY_DB_ID;
+
+export type ActivityLog = {
+  id: string;
+  date: string;
+  messagesSent: number;
+  replies: number;
+  callsMade: number;
+  avgCallMinutes: number;
+  converted: number;
+  notes: string;
+};
+
+export async function getActivityLogs(): Promise<ActivityLog[]> {
+  if (!ACTIVITY_DB_ID) return [];
+  const res = await notion.databases.query({
+    database_id: ACTIVITY_DB_ID,
+    sorts: [{ property: "Date", direction: "descending" }],
+    page_size: 30,
+  });
+  return res.results.map((p) => {
+    const props = (p as { properties: Record<string, Record<string, unknown>> }).properties;
+    return {
+      id: (p as { id: string }).id,
+      date: (props.Date?.date as { start: string })?.start ?? "",
+      messagesSent: (props["Messages Sent"]?.number as number) ?? 0,
+      replies: (props.Replies?.number as number) ?? 0,
+      callsMade: (props["Calls Made"]?.number as number) ?? 0,
+      avgCallMinutes: (props["Avg Call Min"]?.number as number) ?? 0,
+      converted: (props.Converted?.number as number) ?? 0,
+      notes: ((props.Notes?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+    };
+  });
+}
+
+export async function createActivityLog(data: Omit<ActivityLog, "id">) {
+  if (!ACTIVITY_DB_ID) throw new Error("NOTION_ACTIVITY_DB_ID not set");
+  return notion.pages.create({
+    parent: { database_id: ACTIVITY_DB_ID },
+    properties: {
+      Date: { date: { start: data.date } },
+      "Messages Sent": { number: data.messagesSent },
+      Replies: { number: data.replies },
+      "Calls Made": { number: data.callsMade },
+      "Avg Call Min": { number: data.avgCallMinutes },
+      Converted: { number: data.converted },
+      Notes: { rich_text: [{ text: { content: data.notes } }] },
+    } as Parameters<typeof notion.pages.create>[0]["properties"],
+  });
+}
+
+export async function updateActivityLog(id: string, data: Partial<Omit<ActivityLog, "id">>) {
+  if (!ACTIVITY_DB_ID) throw new Error("NOTION_ACTIVITY_DB_ID not set");
+  const props: Record<string, unknown> = {};
+  if (data.date) props.Date = { date: { start: data.date } };
+  if (data.messagesSent !== undefined) props["Messages Sent"] = { number: data.messagesSent };
+  if (data.replies !== undefined) props.Replies = { number: data.replies };
+  if (data.callsMade !== undefined) props["Calls Made"] = { number: data.callsMade };
+  if (data.avgCallMinutes !== undefined) props["Avg Call Min"] = { number: data.avgCallMinutes };
+  if (data.converted !== undefined) props.Converted = { number: data.converted };
+  if (data.notes !== undefined) props.Notes = { rich_text: [{ text: { content: data.notes } }] };
+  return notion.pages.update({ page_id: id, properties: props } as Parameters<typeof notion.pages.update>[0]);
+}
+
+// ── Run Logs ─────────────────────────────────────────────────────────────────
+const RUNS_DB_ID = process.env.NOTION_RUNS_DB_ID;
+
+export type RunLog = {
+  id: string;
+  date: string;
+  type: string;
+  contactName: string;
+  phone: string;
+  step: string;
+  status: "success" | "failed";
+  message: string;
+  error: string;
+};
+
+export async function getRunLogs(limit = 50): Promise<RunLog[]> {
+  if (!RUNS_DB_ID) return [];
+  const res = await notion.databases.query({
+    database_id: RUNS_DB_ID,
+    sorts: [{ property: "Date", direction: "descending" }],
+    page_size: limit,
+  });
+  return res.results.map((p) => {
+    const props = (p as { properties: Record<string, Record<string, unknown>> }).properties;
+    return {
+      id: (p as { id: string }).id,
+      date: (props.Date?.date as { start: string })?.start ?? "",
+      type: ((props.Type?.select as { name: string })?.name) ?? "Drip",
+      contactName: ((props.Name?.title as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+      phone: ((props.Phone?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+      step: ((props.Step?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+      status: ((props.Status?.select as { name: string })?.name === "failed" ? "failed" : "success") as "success" | "failed",
+      message: ((props.Message?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+      error: ((props.Error?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+    };
+  });
+}
+
+export async function createRunLog(data: Omit<RunLog, "id">) {
+  if (!RUNS_DB_ID) return;
+  await notion.pages.create({
+    parent: { database_id: RUNS_DB_ID },
+    properties: {
+      Name: { title: [{ text: { content: data.contactName } }] },
+      Date: { date: { start: data.date } },
+      Type: { select: { name: data.type } },
+      Phone: { rich_text: [{ text: { content: data.phone } }] },
+      Step: { rich_text: [{ text: { content: data.step } }] },
+      Status: { select: { name: data.status } },
+      Message: { rich_text: [{ text: { content: data.message.slice(0, 200) } }] },
+      Error: { rich_text: [{ text: { content: data.error.slice(0, 200) } }] },
+    } as Parameters<typeof notion.pages.create>[0]["properties"],
+  });
+}
+
 export function extractContactProps(page: Record<string, unknown>) {
   const props = (page as { properties: Record<string, unknown> }).properties as Record<string, {
     type: string;
@@ -99,5 +219,7 @@ export function extractContactProps(page: Record<string, unknown>) {
     area: props.Area?.rich_text?.[0]?.plain_text ?? "",
     source: props.Source?.rich_text?.[0]?.plain_text ?? "",
     verified: props.Verified?.checkbox ?? false,
+    offerDate: props["Offer Date"]?.date?.start ?? null,
+    closeDate: props["Close Date"]?.date?.start ?? null,
   };
 }

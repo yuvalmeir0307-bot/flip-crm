@@ -14,6 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
   "The Pool": "#a855f7",
   "Replied - Pivot Call Needed - HOT": "#f97316",
   "Deal sent- Discovery call needed": "#ec4899",
+  "Offer Submitted": "#facc15",
   "No Deal - Auto Reply": "#ef4444",
   "Underwriting": "#22c55e",
   "60-Day Rest": "#6b7280",
@@ -22,16 +23,18 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_SHORT: Record<string, string> = {
   "Drip Active": "Drip Active",
   "The Pool": "The Pool",
-  "Replied - Pivot Call Needed - HOT": "Hot 🔥",
-  "Deal sent- Discovery call needed": "Deal",
+  "Replied - Pivot Call Needed - HOT": "Hot",
+  "Deal sent- Discovery call needed": "Deal Sent",
+  "Offer Submitted": "Offer",
   "No Deal - Auto Reply": "No Deal",
-  "Underwriting": "Underwriting",
+  "Underwriting": "Closed",
   "60-Day Rest": "60-Day Rest",
 };
 
 const ALL_STATUSES = [
   "Drip Active", "The Pool", "Replied - Pivot Call Needed - HOT",
-  "Deal sent- Discovery call needed", "No Deal - Auto Reply", "Underwriting", "60-Day Rest",
+  "Deal sent- Discovery call needed", "Offer Submitted",
+  "No Deal - Auto Reply", "Underwriting", "60-Day Rest",
 ];
 
 const FILTER_TABS = [
