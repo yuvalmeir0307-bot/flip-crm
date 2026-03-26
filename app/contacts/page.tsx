@@ -102,9 +102,9 @@ export default function ContactsPage() {
           <button
             onClick={() => setShowAdd(!showAdd)}
             style={{
-              background: "#1a1a1a", color: "#fff", border: "none",
-              borderRadius: 10, padding: "11px 22px", fontWeight: 600,
-              fontSize: 14, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              background: "#00e5ff", color: "#000", border: "none",
+              borderRadius: 10, padding: "11px 22px", fontWeight: 700,
+              fontSize: 14, boxShadow: "0 4px 12px rgba(0,229,255,0.2)",
             }}
           >
             + Add Contact
