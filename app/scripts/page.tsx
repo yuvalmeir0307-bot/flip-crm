@@ -221,10 +221,10 @@ export default function ScriptsPage() {
   const displayed = tab === "Drip" ? dripScripts : poolScripts;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+    <div className="app-root">
       <Sidebar />
 
-      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+      <div className="app-main">
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Campaign Scripts</h1>

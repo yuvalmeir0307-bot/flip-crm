@@ -92,10 +92,10 @@ export default function ContactsPage() {
   });
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+    <div className="app-root">
       <Sidebar />
 
-      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+      <div className="app-main">
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div>

@@ -11,15 +11,19 @@ import {
 import { getAllScripts, resolveMessage, ScriptEntry } from "@/lib/scripts";
 
 export async function GET(req: NextRequest) {
-  // Allow Vercel cron + manual trigger with secret
   const authHeader = req.headers.get("authorization");
-  if (
-    process.env.NODE_ENV === "production" &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}` &&
-    !req.headers.get("x-vercel-cron")
-  ) {
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
+  const secret = process.env.CRON_SECRET || "flip123secret";
+  const isAuthorized = authHeader === `Bearer ${secret}`;
+
+  if (process.env.NODE_ENV === "production" && !isVercelCron && !isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const url = new URL(req.url);
+  const filterPhone = url.searchParams.get("phone"); // e.g. ?phone=+19049621004
+  const dryRun = url.searchParams.get("dryRun") === "true"; // ?dryRun=true
+  const firstOnly = url.searchParams.get("firstOnly") === "true"; // ?firstOnly=true → only Step 0
 
   // Load scripts from Notion (fallback to hardcoded if unavailable)
   let notionScripts: ScriptEntry[] = [];
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
   }
 
   const pages = await getActiveContacts();
-  const logs: string[] = [`Found ${pages.length} contacts to process`];
+  const logs: string[] = [`Found ${pages.length} contacts to process${filterPhone ? ` (filtered to: ${filterPhone})` : ""}${firstOnly ? " [FIRST TOUCH ONLY]" : ""}${dryRun ? " [DRY RUN]" : ""}`];
 
   for (let i = 0; i < pages.length; i++) {
     const contact = extractContactProps(pages[i] as Record<string, unknown>);
@@ -40,8 +44,27 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
+    // Phone filter for targeted testing
+    if (filterPhone && contact.phone.replace(/\D/g, "") !== filterPhone.replace(/\D/g, "")) {
+      logs.push(`Skipping ${contact.name} (${contact.phone}) - not target`);
+      continue;
+    }
+
     const isPool = contact.status === "The Pool";
     const currentStep = isPool ? (contact.poolStep || 1) : (contact.dripStep || 0);
+
+    // firstOnly mode: skip anyone not at Drip Step 0, and skip Pool contacts entirely
+    if (firstOnly) {
+      if (isPool) {
+        logs.push(`Skipping ${contact.name} - Pool contact (not first touch)`);
+        continue;
+      }
+      if (currentStep !== 0) {
+        logs.push(`Skipping ${contact.name} - already at Step ${currentStep} (not first touch)`);
+        continue;
+      }
+    }
+
     const firstName = contact.name.split(" ")[0] || "there";
     const senderPhone = getSender(i);
     const senderName = getSenderName(i);
@@ -62,7 +85,13 @@ export async function GET(req: NextRequest) {
 
     const delay = isPool ? getPoolDelay(currentStep) : getDripDelay(currentStep);
 
-    logs.push(`Sending to ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
+    logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
+    logs.push(`Message: "${message}"`);
+
+    if (dryRun) {
+      logs.push(`Would update: step → ${isPool ? "Pool " + ((currentStep >= 9 ? 5 : currentStep + 1)) : currentStep >= 4 ? "→ The Pool" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
+      continue;
+    }
 
     const result = await sendSMS(contact.phone, message, senderPhone);
 
@@ -90,7 +119,6 @@ export async function GET(req: NextRequest) {
         updateProps["Pool step"] = { number: nextStep };
       } else {
         if (currentStep >= 4) {
-          // After Final Drip (step 4) → move to The Pool
           updateProps["Status"] = { select: { name: "The Pool" } };
           updateProps["Pool step"] = { number: 1 };
         } else {
@@ -99,9 +127,9 @@ export async function GET(req: NextRequest) {
       }
 
       await updateContact(contact.id, updateProps);
-      logs.push(`OK: Sent & updated Notion`);
+      logs.push(`✅ Sent & updated Notion`);
     } else {
-      logs.push(`FAIL: ${result.error}`);
+      logs.push(`❌ Failed: ${result.error}`);
     }
   }
 

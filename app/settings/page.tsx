@@ -137,9 +137,9 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+    <div className="app-root">
       <Sidebar />
-      <main style={{ flex: 1, padding: "32px 36px", overflowY: "auto" }}>
+      <main className="app-main">
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Settings</h1>
         <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20 }}>System configuration, automation logs, and SMS flow</p>
 

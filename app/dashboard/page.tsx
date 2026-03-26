@@ -55,6 +55,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [runningCron, setRunningCron] = useState(false);
   const [cronLogs, setCronLogs] = useState<string[]>([]);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     fetch("/api/contacts").then((r) => r.json()).then((data) => {
@@ -63,10 +64,15 @@ export default function Dashboard() {
     });
   }, []);
 
+  const step0Count = contacts.filter((c) => c.status === "Drip Active" && (c.dripStep || 0) === 0).length;
+
   async function runDrip() {
+    setShowConfirm(false);
     setRunningCron(true);
     setCronLogs([]);
-    const res = await fetch("/api/cron/drip");
+    const res = await fetch("/api/cron/drip?firstOnly=true", {
+      headers: { Authorization: "Bearer flip123secret" },
+    });
     const data = await res.json();
     setCronLogs(data.logs ?? []);
     setRunningCron(false);
@@ -127,10 +133,10 @@ export default function Dashboard() {
   const poolFinal = poolPoints.some((v) => v > 0) ? poolPoints : buildSeries(7, (c) => c.status === "The Pool");
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+    <div className="app-root">
       <Sidebar />
 
-      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+      <div className="app-main">
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
           <div>
@@ -138,7 +144,7 @@ export default function Dashboard() {
             <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 2 }}>Welcome back, Yuval and Yahav</p>
           </div>
           <button
-            onClick={runDrip}
+            onClick={() => setShowConfirm(true)}
             disabled={runningCron}
             style={{
               background: "#1a1a1a", color: "#fff", border: "none",
@@ -153,6 +159,47 @@ export default function Dashboard() {
             {runningCron ? "Running..." : "Run Drip Now"}
           </button>
         </div>
+
+        {/* ── Confirmation Modal ── */}
+        {showConfirm && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(2px)",
+          }} onClick={() => setShowConfirm(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: "#1a1a1a", borderRadius: 16, padding: "32px 28px", width: 400, maxWidth: "90vw",
+              border: "1px solid #333", boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Are you sure?</div>
+              <p style={{ color: "#9ca3af", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+                This will send the <span style={{ color: "#00e5ff", fontWeight: 600 }}>first SMS</span> to{" "}
+                <span style={{ color: "#00e5ff", fontWeight: 700 }}>{step0Count}</span> new contacts at Step 0.
+                <br />Messages will be sent immediately and cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  style={{
+                    background: "transparent", border: "1px solid #444", color: "#aaa",
+                    borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={runDrip}
+                  style={{
+                    background: "#00e5ff", border: "none", color: "#000",
+                    borderRadius: 8, padding: "10px 24px", fontSize: 14, fontWeight: 700,
+                  }}
+                >
+                  Yes, Send Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>

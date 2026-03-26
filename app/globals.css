@@ -26,3 +26,132 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { border-color: #00e5ff55; }
 input::placeholder, textarea::placeholder { color: #555; }
 select option { background: #1a1a1a; }
+
+/* ── App Layout ── */
+.app-root {
+  display: flex;
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.app-main {
+  flex: 1;
+  padding: 32px 36px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Mobile: hidden by default ── */
+.mobile-header { display: none; }
+.mobile-bottom-nav { display: none; }
+.mobile-overlay { display: none; }
+
+/* ── Responsive grid helpers ── */
+.kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.kpi-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+/* ── Mobile breakpoint ── */
+@media (max-width: 768px) {
+
+  /* Hide desktop sidebar */
+  .desktop-sidebar { display: none !important; }
+
+  /* Show mobile top header */
+  .mobile-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: #1a1a1a;
+    padding: 0 16px;
+    z-index: 200;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  /* Show bottom nav */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 62px;
+    background: #1a1a1a;
+    border-top: 1px solid #252525;
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Drawer overlay */
+  .mobile-overlay {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 300;
+    backdrop-filter: blur(2px);
+  }
+
+  .mobile-drawer {
+    width: 280px;
+    height: 100%;
+    background: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.22s ease;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+
+  /* App layout on mobile */
+  .app-root {
+    flex-direction: column;
+    padding-top: 56px;
+    padding-bottom: 62px;
+  }
+
+  .app-main {
+    padding: 20px 16px !important;
+    overflow-x: hidden;
+  }
+
+  /* Responsive grids */
+  .kpi-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Smaller fonts on mobile */
+  h1 { font-size: 20px !important; }
+
+  /* Wrap flex rows on mobile */
+  .mobile-wrap { flex-wrap: wrap !important; }
+  .mobile-full { width: 100% !important; min-width: unset !important; }
+
+  /* Table scroll */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Hide non-essential columns on mobile */
+  .hide-mobile { display: none !important; }
+}
+
+/* ── Tablet breakpoint ── */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .app-main { padding: 24px 20px; }
+  .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
