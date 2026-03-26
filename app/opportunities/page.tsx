@@ -80,16 +80,16 @@ function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange
             borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
           }}
         >
-          Mark as Potential Deal
+          Potential Deal
         </button>
         <button
-          onClick={() => onStatusChange(contact.id, "Deal sent- Discovery call needed")}
+          onClick={() => onStatusChange(contact.id, "The Pool")}
           style={{
-            background: "#ec489922", color: "#f472b6", border: "1px solid #ec489944",
+            background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744",
             borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
           }}
         >
-          Send Deal
+          Move to Pool
         </button>
       </div>
     </div>
