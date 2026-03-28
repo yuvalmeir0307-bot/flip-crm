@@ -35,6 +35,102 @@ function WarmthBadge({ level }: { level: string }) {
   );
 }
 
+function ScriptPanel({ title, accentColor, children }: { title: string; accentColor: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      background: "#141414", borderRadius: 12, marginBottom: 16,
+      border: `1px solid ${accentColor}33`,
+      overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px", background: "none", border: "none", cursor: "pointer",
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          📋 {title}
+        </span>
+        <span style={{ fontSize: 16, color: accentColor, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+          ›
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${accentColor}22` }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type ScriptLine =
+  | { type: "pause"; text?: never }
+  | { type: "line" | "bold" | "bracket"; text: string };
+
+type DiscoveryStep = {
+  num: number;
+  text: string;
+  bold?: boolean;
+  sub: { bold: boolean; text: string }[];
+};
+
+const HOT_SCRIPT_LINES: ScriptLine[] = [
+  { type: "line", text: 'Hi [Agent name], this is [Your name] with HBI Realty. How you doing?' },
+  { type: "pause" },
+  { type: "bold", text: "Awesome. I'm contacting you because me and my partner are looking to buy another investment property in the [market] area. Is this something you can help with?" },
+  { type: "pause" },
+  { type: "bracket", text: 'Yes / It depends / What are you looking for? / How can I help? / etc' },
+  { type: "pause" },
+  { type: "bold", text: "We're looking for properties with motivated sellers that want to sell fast for cash, or houses that need some work... The reason because my partner has a construction team to help me fix up the houses after we buy them. But it's been difficult lately to find any properties on the MLS that makes sense..." },
+  { type: "bold", text: "So I thought I tried you to see if you have any properties with motivated sellers coming up, or if you can ask around your office to see if any of your agent friends have a house that needs work about to hit the market?" },
+  { type: "pause" },
+  { type: "bracket", text: 'If they say no' },
+  { type: "bold", text: "I'm going to send you my contact information after we hang up so you can have it saved in your phone. If you have any properties coming up the pipeline in the future, please let me know. I would love to have you write the offers for us, and this way you can keep both sides of the commissions on all of your listings." },
+  { type: "pause" },
+  { type: "line", text: "I appreciate your time. Nice talking to you. Have a great day." },
+  { type: "pause" },
+  { type: "bracket", text: 'If agent said they have a property coming up' },
+  { type: "bold", text: "Great. Can you catch me up to speed with the seller situation on this property?" },
+  { type: "line", text: "What's the property address?" },
+];
+
+const DISCOVERY_STEPS: DiscoveryStep[] = [
+  { num: 1, text: "Build rapport (15 – 30 seconds)", sub: [] },
+  {
+    num: 2, text: "Ask for property address if not available. If agent doesn't want to give address:", sub: [
+      { bold: true, text: "Ask if they can send property-specific BBA for us to sign, then they share the address → reassure agent that we don't go around them." },
+      { bold: false, text: "Ask why cannot share? When are they able to give an update on it?" },
+      { bold: false, text: "Most common reason why agent don't wanna share address is because they don't have listing agreement. About 5% of the time seller don't wanna disclose address." },
+    ],
+  },
+  {
+    num: 3, bold: true,
+    text: '"Can you catch me up to speed with the situation of the seller on this one?" / "What\'s the story on this house"', sub: [],
+  },
+  {
+    num: 4, text: "If agent doesn't tell seller situation, begin to ask assumption questions such as:", sub: [
+      { bold: false, text: "Is it an owner-occupied house or did the seller rent it out?" },
+      { bold: false, text: "Is it vacant at the moment or someone living in it?" },
+    ],
+  },
+  {
+    num: 5, text: "Ask agent about the condition of the property (don't have to ask all depending on the flow):", sub: [
+      { bold: false, text: "What kind of conditions is it in?" },
+      { bold: false, text: "What repairs do you think it needs?" },
+      { bold: false, text: "Any ideas on age of roof and AC?" },
+    ],
+  },
+  {
+    num: 6, bold: true, text: "[Back up] way to ask seller motivation if still unclear", sub: [
+      { bold: false, text: '[Say something about the feature of the house or the history of the house]... What makes the seller decide to sell?' },
+    ],
+  },
+  { num: 7, text: "Ask timeline.", sub: [] },
+];
+
 function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange: (id: string, status: string) => void }) {
   return (
     <div style={{
@@ -320,6 +416,30 @@ export default function OpportunitiesPage() {
                   {hotContacts.length}
                 </span>
               </div>
+              <ScriptPanel title="גיוס מתווכים — Recruitment Script" accentColor="#f97316">
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {HOT_SCRIPT_LINES.map((line, i) => {
+                    if (line.type === "pause") return (
+                      <div key={i} style={{ color: "#444", fontSize: 12, paddingLeft: 4 }}>...</div>
+                    );
+                    if (line.type === "bracket") return (
+                      <div key={i} style={{
+                        color: "#f97316", fontSize: 12, fontStyle: "italic",
+                        background: "#f9731611", borderRadius: 6, padding: "4px 10px",
+                      }}>
+                        [{line.text}]
+                      </div>
+                    );
+                    if (line.type === "bold") return (
+                      <div key={i} style={{ color: "#fff", fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>{line.text}</div>
+                    );
+                    return (
+                      <div key={i} style={{ color: "#aaa", fontSize: 13, lineHeight: 1.5 }}>{line.text}</div>
+                    );
+                  })}
+                </div>
+              </ScriptPanel>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {hotContacts.length === 0 ? (
                   <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
@@ -348,6 +468,38 @@ export default function OpportunitiesPage() {
                   {dealContacts.length}
                 </span>
               </div>
+              <ScriptPanel title="1st Discovery Call Script" accentColor="#10b981">
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {DISCOVERY_STEPS.map((step) => (
+                    <div key={step.num}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <span style={{
+                          minWidth: 20, height: 20, borderRadius: "50%",
+                          background: "#10b98133", color: "#34d399",
+                          fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0, marginTop: 1,
+                        }}>{step.num}</span>
+                        <span style={{ fontSize: 13, color: step.bold ? "#fff" : "#bbb", fontWeight: step.bold ? 700 : 400, lineHeight: 1.5 }}>
+                          {step.text}
+                        </span>
+                      </div>
+                      {step.sub.length > 0 && (
+                        <div style={{ marginLeft: 28, marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                          {step.sub.map((s, si) => (
+                            <div key={si} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                              <span style={{ color: "#10b981", fontSize: 11, marginTop: 2, flexShrink: 0 }}>›</span>
+                              <span style={{ fontSize: 12, color: s.bold ? "#fff" : "#999", fontWeight: s.bold ? 700 : 400, lineHeight: 1.5 }}>
+                                {s.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScriptPanel>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {dealContacts.length === 0 ? (
                   <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
