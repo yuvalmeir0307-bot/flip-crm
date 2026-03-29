@@ -74,6 +74,71 @@ ${transcript}`;
   return parsed;
 }
 
+export type QualificationAnalysis = {
+  agentName: string;
+  brokerage: string;
+  market: string;
+  experience: "New" | "Mid-level" | "Veteran" | "Unknown";
+  personality: string;
+  callSummary: string;
+  doubleCommissionStatus: "Accepted" | "Open" | "Declined" | "Not Discussed";
+  doubleCommissionContext: string;
+  painPoints: string[];
+  rapportBuilders: string[];
+  jvPotential: "High" | "Medium" | "Low" | "Too Early to Tell";
+  jvReasoning: string;
+  followUpStrategy: string;
+};
+
+export async function analyzeQualificationCall(transcript: string): Promise<QualificationAnalysis> {
+  const prompt = `You are a Real Estate Team Manager and JV Specialist analyzing a qualification/pivot call with a real estate agent.
+
+Your goal: extract agent relationship intelligence so the team can build genuine rapport, provide value, and close deals together.
+
+Respond ONLY with a valid JSON object in this exact shape:
+{
+  "agentName": "name or Unknown",
+  "brokerage": "brokerage name or Unknown",
+  "market": "city/area or Unknown",
+  "experience": "New" | "Mid-level" | "Veteran" | "Unknown",
+  "personality": "brief 3-5 word characterization (e.g. 'Warm and chatty, easy rapport')",
+  "callSummary": "3-5 sentence recap of the call: who they are, what was discussed, overall vibe and outcome",
+  "doubleCommissionStatus": "Accepted" | "Open" | "Declined" | "Not Discussed",
+  "doubleCommissionContext": "1-2 sentences on what was said about dual agency / double commission",
+  "painPoints": [
+    "Pain point 1 with context",
+    "Pain point 2 with context"
+  ],
+  "rapportBuilders": [
+    "Personal detail or shared interest from the call",
+    "Another rapport note"
+  ],
+  "jvPotential": "High" | "Medium" | "Low" | "Too Early to Tell",
+  "jvReasoning": "1-2 sentences on why this JV potential rating — based on tone, openness, and what was said",
+  "followUpStrategy": "Specific actionable follow-up plan referencing things from the call. What to open with, what to offer, what to ask."
+}
+
+TRANSCRIPT:
+${transcript}`;
+
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
+    }),
+  });
+
+  const data = await res.json();
+  const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON in Gemini response");
+
+  return JSON.parse(jsonMatch[0]) as QualificationAnalysis;
+}
+
 export type ClassifyResult = "HOT" | "NO_DEAL" | "NEUTRAL";
 
 export async function classifyReply(message: string): Promise<ClassifyResult> {

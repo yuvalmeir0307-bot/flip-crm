@@ -20,6 +20,187 @@ type DiscoveryAnalysis = {
   nextSteps: string[];
 };
 
+type QualificationAnalysis = {
+  agentName: string;
+  brokerage: string;
+  market: string;
+  experience: "New" | "Mid-level" | "Veteran" | "Unknown";
+  personality: string;
+  callSummary: string;
+  doubleCommissionStatus: "Accepted" | "Open" | "Declined" | "Not Discussed";
+  doubleCommissionContext: string;
+  painPoints: string[];
+  rapportBuilders: string[];
+  jvPotential: "High" | "Medium" | "Low" | "Too Early to Tell";
+  jvReasoning: string;
+  followUpStrategy: string;
+};
+
+function QualificationModal({ analysis, contactName, onClose, onSave }: {
+  analysis: QualificationAnalysis;
+  contactName: string;
+  onClose: () => void;
+  onSave: (notes: string) => void;
+}) {
+  const [saved, setSaved] = useState(false);
+
+  const jvColor = analysis.jvPotential === "High" ? "#10b981"
+    : analysis.jvPotential === "Medium" ? "#facc15"
+    : analysis.jvPotential === "Too Early to Tell" ? "#a78bfa"
+    : "#60a5fa";
+
+  const dcColor = analysis.doubleCommissionStatus === "Accepted" ? "#10b981"
+    : analysis.doubleCommissionStatus === "Open" ? "#facc15"
+    : analysis.doubleCommissionStatus === "Declined" ? "#ef4444"
+    : "#888";
+
+  const dcIcon = analysis.doubleCommissionStatus === "Accepted" ? "✅"
+    : analysis.doubleCommissionStatus === "Open" ? "🤔"
+    : analysis.doubleCommissionStatus === "Declined" ? "❌"
+    : "—";
+
+  const summaryNote = `[Qualification Call — ${new Date().toLocaleDateString()}]
+Agent: ${analysis.agentName} | ${analysis.brokerage} | ${analysis.market}
+Double Commission: ${analysis.doubleCommissionStatus} | JV Potential: ${analysis.jvPotential}
+${analysis.callSummary}
+Pain Points: ${analysis.painPoints.join(" | ")}
+Rapport: ${analysis.rapportBuilders.join(" | ")}
+Follow-Up: ${analysis.followUpStrategy}`;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#141414", border: "1px solid #333", borderRadius: 16,
+          width: "100%", maxWidth: 580, maxHeight: "90vh", overflowY: "auto",
+          padding: 28, boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+              Qualification Call Analysis
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{contactName}</div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{analysis.brokerage} · {analysis.market}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{
+              background: `${jvColor}22`, color: jvColor, border: `1px solid ${jvColor}44`,
+              borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700,
+            }}>
+              JV: {analysis.jvPotential}
+            </span>
+            <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+          </div>
+        </div>
+
+        {/* Double Commission Banner */}
+        <div style={{
+          background: `${dcColor}11`, border: `1px solid ${dcColor}33`,
+          borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}>
+          <span style={{ fontSize: 18 }}>{dcIcon}</span>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: dcColor, marginBottom: 3 }}>
+              Double Commission — {analysis.doubleCommissionStatus}
+            </div>
+            <div style={{ fontSize: 12, color: "#bbb", lineHeight: 1.5 }}>{analysis.doubleCommissionContext}</div>
+          </div>
+        </div>
+
+        {/* Call Summary */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Call Summary</div>
+          <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6, background: "#1a1a1a", borderRadius: 8, padding: "10px 14px" }}>
+            {analysis.callSummary}
+          </div>
+        </div>
+
+        {/* Pain Points */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Pain Points</div>
+          {analysis.painPoints.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#444" }}>None identified</div>
+          ) : analysis.painPoints.map((pt, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
+              <span style={{ color: "#f97316", fontSize: 12, marginTop: 2, flexShrink: 0 }}>⚡</span>
+              <span style={{ fontSize: 13, color: "#ddd", lineHeight: 1.4 }}>{pt}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Rapport Builders */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Rapport Builders</div>
+          {analysis.rapportBuilders.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#444" }}>None captured</div>
+          ) : analysis.rapportBuilders.map((rb, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
+              <span style={{ color: "#34d399", fontSize: 12, marginTop: 2, flexShrink: 0 }}>💬</span>
+              <span style={{ fontSize: 13, color: "#ddd", lineHeight: 1.4 }}>{rb}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* JV Potential */}
+        <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>JV Potential</span>
+            <span style={{ color: jvColor, fontWeight: 700, fontSize: 12 }}>{analysis.jvPotential}</span>
+          </div>
+          <div style={{ fontSize: 13, color: "#bbb", lineHeight: 1.5 }}>{analysis.jvReasoning}</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#888" }}>
+            {analysis.agentName} · {analysis.experience} · {analysis.personality}
+          </div>
+        </div>
+
+        {/* Follow-Up Strategy */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Follow-Up Strategy</div>
+          <div style={{
+            fontSize: 13, color: "#ddd", lineHeight: 1.6,
+            background: "#10b98111", border: "1px solid #10b98133",
+            borderRadius: 8, padding: "12px 14px",
+          }}>
+            {analysis.followUpStrategy}
+          </div>
+        </div>
+
+        {/* Save */}
+        <div style={{ display: "flex", gap: 10 }}>
+          {saved ? (
+            <span style={{ fontSize: 13, color: "#34d399", fontWeight: 600 }}>✓ Notes saved to contact</span>
+          ) : (
+            <button
+              onClick={() => { onSave(summaryNote); setSaved(true); }}
+              style={{
+                background: "#10b981", color: "#000", border: "none",
+                borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Save Notes to Contact
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: "#2a2a2a", color: "#888", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnalysisModal({ analysis, contactName, onClose, onSave }: {
   analysis: DiscoveryAnalysis;
   contactName: string;
@@ -333,31 +514,31 @@ function HotCard({ contact, onStatusChange, onSave }: {
 }) {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
-  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [analyzeError, setAnalyzeError] = useState("");
-  const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+  const [qualifyState, setQualifyState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [qualifyError, setQualifyError] = useState("");
+  const [qualification, setQualification] = useState<QualificationAnalysis | null>(null);
 
-  async function analyzeCall() {
-    setAnalyzeState("loading");
+  async function qualifyCall() {
+    setQualifyState("loading");
     try {
-      const res = await fetch("/api/analyze-call", {
+      const res = await fetch("/api/qualify-call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: contact.phone }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setAnalyzeState("error");
-        setAnalyzeError(data.error ?? "Analysis failed");
-        setTimeout(() => setAnalyzeState("idle"), 5000);
+        setQualifyState("error");
+        setQualifyError(data.error ?? "Analysis failed");
+        setTimeout(() => setQualifyState("idle"), 5000);
       } else {
-        setAnalysis(data.analysis);
-        setAnalyzeState("done");
+        setQualification(data.analysis);
+        setQualifyState("done");
       }
     } catch {
-      setAnalyzeState("error");
-      setAnalyzeError("Network error");
-      setTimeout(() => setAnalyzeState("idle"), 5000);
+      setQualifyState("error");
+      setQualifyError("Network error");
+      setTimeout(() => setQualifyState("idle"), 5000);
     }
   }
 
@@ -387,12 +568,12 @@ function HotCard({ contact, onStatusChange, onSave }: {
 
   return (
     <>
-    {analyzeState === "done" && analysis && (
-      <AnalysisModal
-        analysis={analysis}
+    {qualifyState === "done" && qualification && (
+      <QualificationModal
+        analysis={qualification}
         contactName={contact.name}
-        onClose={() => setAnalyzeState("idle")}
-        onSave={(warmth, notes) => onSave(contact.id, { warmth, notes })}
+        onClose={() => setQualifyState("idle")}
+        onSave={(notes) => onSave(contact.id, { notes })}
       />
     )}
     <div style={{
@@ -496,22 +677,22 @@ function HotCard({ contact, onStatusChange, onSave }: {
         >
           Move to Pool
         </button>
-        {analyzeState === "idle" && (
+        {qualifyState === "idle" && (
           <button
-            onClick={analyzeCall}
+            onClick={qualifyCall}
             style={{
-              background: "#7c3aed22", color: "#a78bfa", border: "1px solid #7c3aed44",
+              background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944",
               borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
             }}
           >
             🧠 Analyze Call
           </button>
         )}
-        {analyzeState === "loading" && (
-          <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center" }}>⏳ Analyzing...</span>
+        {qualifyState === "loading" && (
+          <span style={{ fontSize: 12, color: "#38bdf8", alignSelf: "center" }}>⏳ Analyzing...</span>
         )}
-        {analyzeState === "error" && (
-          <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={analyzeError}>✗ {analyzeError}</span>
+        {qualifyState === "error" && (
+          <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={qualifyError}>✗ {qualifyError}</span>
         )}
       </div>
     </div>
