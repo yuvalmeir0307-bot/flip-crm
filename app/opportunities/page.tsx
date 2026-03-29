@@ -2,6 +2,201 @@
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 
+type PillarScore = { score: number; evidence: string };
+type DiscoveryAnalysis = {
+  address: string;
+  agentName: string;
+  dualAgencyEligible: "Yes" | "No" | "Unclear";
+  leadScore: number;
+  motivation: PillarScore;
+  timeline: PillarScore;
+  condition: PillarScore;
+  priceFlexibility: PillarScore;
+  viability: "Hot" | "Warm" | "Cold";
+  agentSentiment: "Open to Double Dip" | "Protective/Guard-up";
+  agreedToPresent: "Yes" | "No" | "Unclear";
+  why: string;
+  strategicNote: string;
+  nextSteps: string[];
+};
+
+function AnalysisModal({ analysis, contactName, onClose, onSave }: {
+  analysis: DiscoveryAnalysis;
+  contactName: string;
+  onClose: () => void;
+  onSave: (warmth: string, notes: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const viabilityColor = analysis.viability === "Hot" ? "#f97316" : analysis.viability === "Warm" ? "#a78bfa" : "#60a5fa";
+  const warmthMap: Record<string, string> = { Hot: "Hot", Warm: "Warm", Cold: "Cold" };
+  const suggestedWarmth = warmthMap[analysis.viability] ?? "Cold";
+
+  const scoreColor = (s: number) => s >= 4 ? "#f97316" : s >= 3 ? "#facc15" : "#60a5fa";
+
+  const summaryNote = `[Discovery Call Analysis — Score ${analysis.leadScore}/20 | ${analysis.viability}]
+Address: ${analysis.address}
+Motivation (${analysis.motivation.score}/5): ${analysis.motivation.evidence}
+Timeline (${analysis.timeline.score}/5): ${analysis.timeline.evidence}
+Condition (${analysis.condition.score}/5): ${analysis.condition.evidence}
+Price Flexibility (${analysis.priceFlexibility.score}/5): ${analysis.priceFlexibility.evidence}
+Agent Sentiment: ${analysis.agentSentiment} | Dual Agency: ${analysis.dualAgencyEligible} | Agreed to Present: ${analysis.agreedToPresent}
+Why: ${analysis.why}
+Strategic Note: ${analysis.strategicNote}
+Next Steps: ${analysis.nextSteps.join(" | ")}`;
+
+  async function handleSave() {
+    setSaving(true);
+    onSave(suggestedWarmth, summaryNote);
+    setSaving(false);
+    setSaved(true);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#141414", border: "1px solid #333", borderRadius: 16,
+          width: "100%", maxWidth: 580, maxHeight: "90vh", overflowY: "auto",
+          padding: 28, boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+              Discovery Call Analysis
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{contactName}</div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{analysis.address}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{
+              background: `${viabilityColor}22`, color: viabilityColor,
+              border: `1px solid ${viabilityColor}44`,
+              borderRadius: 20, padding: "4px 14px", fontSize: 13, fontWeight: 700,
+            }}>
+              {analysis.viability === "Hot" ? "🔥" : analysis.viability === "Warm" ? "🌡" : "❄️"} {analysis.viability}
+            </span>
+            <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+          </div>
+        </div>
+
+        {/* Score Bar */}
+        <div style={{ marginBottom: 20, background: "#1a1a1a", borderRadius: 10, padding: "12px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: "#888", fontWeight: 600 }}>LEAD SCORE</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: viabilityColor }}>{analysis.leadScore}<span style={{ fontSize: 13, color: "#555" }}>/20</span></span>
+          </div>
+          <div style={{ background: "#2a2a2a", borderRadius: 6, height: 6, overflow: "hidden" }}>
+            <div style={{ width: `${(analysis.leadScore / 20) * 100}%`, height: "100%", background: viabilityColor, borderRadius: 6, transition: "width 0.4s" }} />
+          </div>
+          <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+            {[
+              { label: "Motivation", score: analysis.motivation.score },
+              { label: "Timeline", score: analysis.timeline.score },
+              { label: "Condition", score: analysis.condition.score },
+              { label: "Price Flex", score: analysis.priceFlexibility.score },
+            ].map(({ label, score }) => (
+              <span key={label} style={{ fontSize: 11, color: "#888" }}>
+                {label}: <span style={{ color: scoreColor(score), fontWeight: 700 }}>{score}/5</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Pillars */}
+        {[
+          { label: "Motivation", data: analysis.motivation },
+          { label: "Timeline", data: analysis.timeline },
+          { label: "Condition", data: analysis.condition },
+          { label: "Price Flexibility", data: analysis.priceFlexibility },
+        ].map(({ label, data }) => (
+          <div key={label} style={{ marginBottom: 12, borderLeft: `3px solid ${scoreColor(data.score)}`, paddingLeft: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase" }}>{label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: scoreColor(data.score) }}>{data.score}/5</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#bbb", lineHeight: 1.5 }}>{data.evidence}</div>
+          </div>
+        ))}
+
+        {/* Sentiment Row */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
+          <span style={{
+            background: analysis.agentSentiment === "Open to Double Dip" ? "#10b98122" : "#ef444422",
+            color: analysis.agentSentiment === "Open to Double Dip" ? "#34d399" : "#f87171",
+            border: `1px solid ${analysis.agentSentiment === "Open to Double Dip" ? "#10b98144" : "#ef444444"}`,
+            borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600,
+          }}>
+            {analysis.agentSentiment}
+          </span>
+          <span style={{ background: "#ffffff11", color: "#aaa", border: "1px solid #333", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>
+            Dual Agency: {analysis.dualAgencyEligible}
+          </span>
+          <span style={{ background: "#ffffff11", color: "#aaa", border: "1px solid #333", borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>
+            Agreed to Present: {analysis.agreedToPresent}
+          </span>
+        </div>
+
+        {/* Critical Analysis */}
+        <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Critical Analysis</div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: "#f97316", fontWeight: 600, marginBottom: 3 }}>The "Why"</div>
+            <div style={{ fontSize: 13, color: "#ddd", lineHeight: 1.5 }}>{analysis.why}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 600, marginBottom: 3 }}>Strategic Note</div>
+            <div style={{ fontSize: 13, color: "#ddd", lineHeight: 1.5 }}>{analysis.strategicNote}</div>
+          </div>
+        </div>
+
+        {/* Next Steps */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Next Steps</div>
+          {analysis.nextSteps.map((step, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
+              <span style={{ minWidth: 18, height: 18, borderRadius: "50%", background: "#10b98133", color: "#34d399", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+              <span style={{ fontSize: 13, color: "#bbb", lineHeight: 1.4 }}>{step}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Save Button */}
+        <div style={{ display: "flex", gap: 10 }}>
+          {saved ? (
+            <span style={{ fontSize: 13, color: "#34d399", fontWeight: 600 }}>✓ Saved to contact</span>
+          ) : (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                background: "#10b981", color: "#000", border: "none",
+                borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              {saving ? "Saving..." : `Save & Set Warmth → ${suggestedWarmth}`}
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: "#2a2a2a", color: "#888", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Contact = {
   id: string;
   name: string;
@@ -131,9 +326,40 @@ const DISCOVERY_STEPS: DiscoveryStep[] = [
   { num: 7, text: "Ask timeline.", sub: [] },
 ];
 
-function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange: (id: string, status: string) => void }) {
+function HotCard({ contact, onStatusChange, onSave }: {
+  contact: Contact;
+  onStatusChange: (id: string, status: string) => void;
+  onSave: (id: string, data: Partial<Contact>) => void;
+}) {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
+  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+
+  async function analyzeCall() {
+    setAnalyzeState("loading");
+    try {
+      const res = await fetch("/api/analyze-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: contact.phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnalyzeState("error");
+        setAnalyzeError(data.error ?? "Analysis failed");
+        setTimeout(() => setAnalyzeState("idle"), 5000);
+      } else {
+        setAnalysis(data.analysis);
+        setAnalyzeState("done");
+      }
+    } catch {
+      setAnalyzeState("error");
+      setAnalyzeError("Network error");
+      setTimeout(() => setAnalyzeState("idle"), 5000);
+    }
+  }
 
   async function initiateCall() {
     setCallState("calling");
@@ -160,6 +386,15 @@ function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange
   }
 
   return (
+    <>
+    {analyzeState === "done" && analysis && (
+      <AnalysisModal
+        analysis={analysis}
+        contactName={contact.name}
+        onClose={() => setAnalyzeState("idle")}
+        onSave={(warmth, notes) => onSave(contact.id, { warmth, notes })}
+      />
+    )}
     <div style={{
       background: "#1a1a1a", borderRadius: 14, padding: 20,
       border: "1px solid #f9731622",
@@ -261,8 +496,26 @@ function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange
         >
           Move to Pool
         </button>
+        {analyzeState === "idle" && (
+          <button
+            onClick={analyzeCall}
+            style={{
+              background: "#7c3aed22", color: "#a78bfa", border: "1px solid #7c3aed44",
+              borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            🧠 Analyze Call
+          </button>
+        )}
+        {analyzeState === "loading" && (
+          <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center" }}>⏳ Analyzing...</span>
+        )}
+        {analyzeState === "error" && (
+          <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={analyzeError}>✗ {analyzeError}</span>
+        )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -276,6 +529,33 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const [warmth, setWarmth] = useState(contact.warmth);
   const [followUpDate, setFollowUpDate] = useState(contact.followUpDate ?? "");
   const [saving, setSaving] = useState(false);
+  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+
+  async function analyzeCall() {
+    setAnalyzeState("loading");
+    try {
+      const res = await fetch("/api/analyze-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: contact.phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnalyzeState("error");
+        setAnalyzeError(data.error ?? "Analysis failed");
+        setTimeout(() => setAnalyzeState("idle"), 5000);
+      } else {
+        setAnalysis(data.analysis);
+        setAnalyzeState("done");
+      }
+    } catch {
+      setAnalyzeState("error");
+      setAnalyzeError("Network error");
+      setTimeout(() => setAnalyzeState("idle"), 5000);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -288,6 +568,19 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const isToday = followUpDate && new Date(followUpDate).toDateString() === new Date().toDateString();
 
   return (
+    <>
+    {analyzeState === "done" && analysis && (
+      <AnalysisModal
+        analysis={analysis}
+        contactName={contact.name}
+        onClose={() => setAnalyzeState("idle")}
+        onSave={(newWarmth, newNotes) => {
+          setWarmth(newWarmth);
+          setNotes((prev) => newNotes + (prev ? "\n\n" + prev : ""));
+          onSave(contact.id, { warmth: newWarmth, notes: newNotes + (notes ? "\n\n" + notes : "") });
+        }}
+      />
+    )}
     <div style={{
       background: "#1a1a1a", borderRadius: 14, padding: 20,
       border: "1px solid #10b98122",
@@ -411,10 +704,28 @@ function DealCard({ contact, onSave, onStatusChange }: {
             }}>
               Edit
             </button>
+            {analyzeState === "idle" && (
+              <button
+                onClick={analyzeCall}
+                style={{
+                  background: "#7c3aed22", color: "#a78bfa", border: "1px solid #7c3aed44",
+                  borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                🧠 Analyze Call
+              </button>
+            )}
+            {analyzeState === "loading" && (
+              <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center" }}>⏳ Analyzing...</span>
+            )}
+            {analyzeState === "error" && (
+              <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={analyzeError}>✗ {analyzeError}</span>
+            )}
           </>
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -520,7 +831,7 @@ export default function OpportunitiesPage() {
                     No hot leads right now
                   </div>
                 ) : hotContacts.map((c) => (
-                  <HotCard key={c.id} contact={c} onStatusChange={handleStatusChange} />
+                  <HotCard key={c.id} contact={c} onStatusChange={handleStatusChange} onSave={handleSave} />
                 ))}
               </div>
             </div>
