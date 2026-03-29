@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeDiscoveryCall } from "@/lib/gemini";
-import { fetchLatestCallTranscript } from "@/lib/openphone-transcript";
+import { fetchLatestCallContent } from "@/lib/openphone-transcript";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,17 +9,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
     }
 
-    const transcript = await fetchLatestCallTranscript(phone);
+    const result = await fetchLatestCallContent(phone);
 
-    if (!transcript) {
+    if (!result.ok) {
       return NextResponse.json(
-        { error: "No call transcript found. Make sure call recording & transcription are enabled in OpenPhone." },
+        { error: result.error, setupUrl: result.setupUrl },
         { status: 404 }
       );
     }
 
-    const analysis = await analyzeDiscoveryCall(transcript);
-    return NextResponse.json({ ok: true, analysis });
+    const analysis = await analyzeDiscoveryCall(result.text);
+    return NextResponse.json({ ok: true, analysis, source: result.source });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

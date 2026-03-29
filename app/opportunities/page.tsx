@@ -516,10 +516,13 @@ function HotCard({ contact, onStatusChange, onSave }: {
   const [callError, setCallError] = useState("");
   const [qualifyState, setQualifyState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [qualifyError, setQualifyError] = useState("");
+  const [qualifySetupUrl, setQualifySetupUrl] = useState("");
   const [qualification, setQualification] = useState<QualificationAnalysis | null>(null);
 
   async function qualifyCall() {
     setQualifyState("loading");
+    setQualifyError("");
+    setQualifySetupUrl("");
     try {
       const res = await fetch("/api/qualify-call", {
         method: "POST",
@@ -530,7 +533,8 @@ function HotCard({ contact, onStatusChange, onSave }: {
       if (!res.ok) {
         setQualifyState("error");
         setQualifyError(data.error ?? "Analysis failed");
-        setTimeout(() => setQualifyState("idle"), 5000);
+        if (data.setupUrl) setQualifySetupUrl(data.setupUrl);
+        setTimeout(() => setQualifyState("idle"), 8000);
       } else {
         setQualification(data.analysis);
         setQualifyState("done");
@@ -538,7 +542,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
     } catch {
       setQualifyState("error");
       setQualifyError("Network error");
-      setTimeout(() => setQualifyState("idle"), 5000);
+      setTimeout(() => setQualifyState("idle"), 8000);
     }
   }
 
@@ -692,7 +696,15 @@ function HotCard({ contact, onStatusChange, onSave }: {
           <span style={{ fontSize: 12, color: "#38bdf8", alignSelf: "center" }}>⏳ Analyzing...</span>
         )}
         {qualifyState === "error" && (
-          <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={qualifyError}>✗ {qualifyError}</span>
+          <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center", maxWidth: 240 }}>
+            ✗ {qualifyError}
+            {qualifySetupUrl && (
+              <a href={qualifySetupUrl} target="_blank" rel="noopener noreferrer"
+                style={{ marginLeft: 6, color: "#38bdf8", textDecoration: "underline" }}>
+                Enable recording →
+              </a>
+            )}
+          </span>
         )}
       </div>
     </div>
@@ -712,10 +724,13 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const [saving, setSaving] = useState(false);
   const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [analyzeError, setAnalyzeError] = useState("");
+  const [analyzeSetupUrl, setAnalyzeSetupUrl] = useState("");
   const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
 
   async function analyzeCall() {
     setAnalyzeState("loading");
+    setAnalyzeError("");
+    setAnalyzeSetupUrl("");
     try {
       const res = await fetch("/api/analyze-call", {
         method: "POST",
@@ -726,7 +741,8 @@ function DealCard({ contact, onSave, onStatusChange }: {
       if (!res.ok) {
         setAnalyzeState("error");
         setAnalyzeError(data.error ?? "Analysis failed");
-        setTimeout(() => setAnalyzeState("idle"), 5000);
+        if (data.setupUrl) setAnalyzeSetupUrl(data.setupUrl);
+        setTimeout(() => setAnalyzeState("idle"), 8000);
       } else {
         setAnalysis(data.analysis);
         setAnalyzeState("done");
@@ -734,7 +750,7 @@ function DealCard({ contact, onSave, onStatusChange }: {
     } catch {
       setAnalyzeState("error");
       setAnalyzeError("Network error");
-      setTimeout(() => setAnalyzeState("idle"), 5000);
+      setTimeout(() => setAnalyzeState("idle"), 8000);
     }
   }
 
@@ -900,7 +916,15 @@ function DealCard({ contact, onSave, onStatusChange }: {
               <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center" }}>⏳ Analyzing...</span>
             )}
             {analyzeState === "error" && (
-              <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }} title={analyzeError}>✗ {analyzeError}</span>
+              <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center", maxWidth: 240 }}>
+                ✗ {analyzeError}
+                {analyzeSetupUrl && (
+                  <a href={analyzeSetupUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ marginLeft: 6, color: "#38bdf8", textDecoration: "underline" }}>
+                    Enable recording →
+                  </a>
+                )}
+              </span>
             )}
           </>
         )}
