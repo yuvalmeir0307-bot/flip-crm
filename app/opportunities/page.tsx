@@ -132,6 +132,33 @@ const DISCOVERY_STEPS: DiscoveryStep[] = [
 ];
 
 function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange: (id: string, status: string) => void }) {
+  const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
+  const [callError, setCallError] = useState("");
+
+  async function initiateCall() {
+    setCallState("calling");
+    try {
+      const res = await fetch("/api/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: contact.phone }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCallState("done");
+        setTimeout(() => setCallState("idle"), 4000);
+      } else {
+        setCallState("error");
+        setCallError(data.error ?? "Call failed");
+        setTimeout(() => setCallState("idle"), 4000);
+      }
+    } catch {
+      setCallState("error");
+      setCallError("Network error");
+      setTimeout(() => setCallState("idle"), 4000);
+    }
+  }
+
   return (
     <div style={{
       background: "#1a1a1a", borderRadius: 14, padding: 20,
@@ -141,7 +168,54 @@ function HotCard({ contact, onStatusChange }: { contact: Contact; onStatusChange
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.phone}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <span style={{ fontSize: 12, color: "#666" }}>{contact.phone}</span>
+            {/* Call Button */}
+            {callState === "idle" && (
+              <button
+                onClick={() => setCallState("confirm")}
+                style={{
+                  background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944",
+                  borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}
+              >
+                📞 Call
+              </button>
+            )}
+            {callState === "confirm" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#fb923c", fontWeight: 600 }}>Call {contact.name.split(" ")[0]}?</span>
+                <button
+                  onClick={initiateCall}
+                  style={{
+                    background: "#f97316", color: "#000", border: "none",
+                    borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setCallState("idle")}
+                  style={{
+                    background: "#2a2a2a", color: "#888", border: "1px solid #333",
+                    borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer",
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {callState === "calling" && (
+              <span style={{ fontSize: 11, color: "#f97316" }}>📞 Calling...</span>
+            )}
+            {callState === "done" && (
+              <span style={{ fontSize: 11, color: "#10b981" }}>✓ Call initiated</span>
+            )}
+            {callState === "error" && (
+              <span style={{ fontSize: 11, color: "#ef4444" }} title={callError}>✗ Failed</span>
+            )}
+          </div>
         </div>
         <span style={{
           background: "#f9731622", color: "#fb923c",
