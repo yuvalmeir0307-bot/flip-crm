@@ -13,6 +13,7 @@ import { getAllContacts, getAllRunLogs, updateContact, extractContactProps } fro
  *   4. Skip contacts that already have assignedTo set.
  */
 export async function POST(req: NextRequest) {
+  try {
   const authHeader = req.headers.get("authorization");
   const secret = process.env.CRON_SECRET || "flip123secret";
   if (authHeader !== `Bearer ${secret}`) {
@@ -72,4 +73,8 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, total: contacts.length, results });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
