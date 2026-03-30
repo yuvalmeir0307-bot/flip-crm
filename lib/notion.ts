@@ -224,5 +224,6 @@ export function extractContactProps(page: Record<string, unknown>) {
     notes: props.Notes?.rich_text?.[0]?.plain_text ?? "",
     warmth: props.Warmth?.select?.name ?? "",
     followUpDate: props["Follow Up Date"]?.date?.start ?? null,
+    assignedTo: props["Assigned To"]?.rich_text?.[0]?.plain_text ?? "",
   };
 }

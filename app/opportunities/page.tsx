@@ -389,6 +389,7 @@ type Contact = {
   notes: string;
   warmth: string;
   followUpDate: string | null;
+  assignedTo: string;
 };
 
 const WARMTH_OPTIONS = ["Cold", "Warm", "Hot"];
@@ -514,6 +515,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
 }) {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
+  const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
   const [qualifyState, setQualifyState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [qualifyError, setQualifyError] = useState("");
   const [qualifySetupUrl, setQualifySetupUrl] = useState("");
@@ -635,6 +637,40 @@ function HotCard({ contact, onStatusChange, onSave }: {
             {callState === "error" && (
               <span style={{ fontSize: 11, color: "#ef4444" }} title={callError}>✗ Failed</span>
             )}
+            {/* Message Button */}
+            {msgState === "idle" && (
+              <button
+                onClick={() => setMsgState("confirm")}
+                style={{
+                  background: "#10b98122", color: "#34d399", border: "1px solid #10b98144",
+                  borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}
+              >
+                💬 Message
+              </button>
+            )}
+            {msgState === "confirm" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#34d399", fontWeight: 600 }}>Message {contact.name.split(" ")[0]}?</span>
+                <a
+                  href={`sms:${contact.phone}`}
+                  onClick={() => setMsgState("idle")}
+                  style={{
+                    background: "#10b981", color: "#000", borderRadius: 6,
+                    padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", textDecoration: "none",
+                  }}
+                >
+                  Confirm
+                </a>
+                <button
+                  onClick={() => setMsgState("idle")}
+                  style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer" }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
           </div>
         </div>
         <span style={{
@@ -645,6 +681,12 @@ function HotCard({ contact, onStatusChange, onSave }: {
           🔥 Replied - HOT
         </span>
       </div>
+
+      {contact.assignedTo && (
+        <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6, fontWeight: 600 }}>
+          👤 {contact.assignedTo}
+        </div>
+      )}
 
       {contact.brokerage && (
         <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
@@ -722,10 +764,37 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const [warmth, setWarmth] = useState(contact.warmth);
   const [followUpDate, setFollowUpDate] = useState(contact.followUpDate ?? "");
   const [saving, setSaving] = useState(false);
+  const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
+  const [callError, setCallError] = useState("");
+  const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
   const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeSetupUrl, setAnalyzeSetupUrl] = useState("");
   const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+
+  async function initiateCall() {
+    setCallState("calling");
+    try {
+      const res = await fetch("/api/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: contact.phone }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCallState("done");
+        setTimeout(() => setCallState("idle"), 4000);
+      } else {
+        setCallState("error");
+        setCallError(data.error ?? "Call failed");
+        setTimeout(() => setCallState("idle"), 4000);
+      }
+    } catch {
+      setCallState("error");
+      setCallError("Network error");
+      setTimeout(() => setCallState("idle"), 4000);
+    }
+  }
 
   async function analyzeCall() {
     setAnalyzeState("loading");
@@ -786,12 +855,87 @@ function DealCard({ contact, onSave, onStatusChange }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.phone}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "#666" }}>{contact.phone}</span>
+            {/* Call Button */}
+            {callState === "idle" && (
+              <button
+                onClick={() => setCallState("confirm")}
+                style={{
+                  background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944",
+                  borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}
+              >
+                📞 Call
+              </button>
+            )}
+            {callState === "confirm" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#fb923c", fontWeight: 600 }}>Call {contact.name.split(" ")[0]}?</span>
+                <button
+                  onClick={initiateCall}
+                  style={{ background: "#f97316", color: "#000", border: "none", borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setCallState("idle")}
+                  style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer" }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {callState === "calling" && <span style={{ fontSize: 11, color: "#f97316" }}>📞 Calling...</span>}
+            {callState === "done" && <span style={{ fontSize: 11, color: "#10b981" }}>✓ Call initiated</span>}
+            {callState === "error" && <span style={{ fontSize: 11, color: "#ef4444" }} title={callError}>✗ Failed</span>}
+            {/* Message Button */}
+            {msgState === "idle" && (
+              <button
+                onClick={() => setMsgState("confirm")}
+                style={{
+                  background: "#10b98122", color: "#34d399", border: "1px solid #10b98144",
+                  borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}
+              >
+                💬 Message
+              </button>
+            )}
+            {msgState === "confirm" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#34d399", fontWeight: 600 }}>Message {contact.name.split(" ")[0]}?</span>
+                <a
+                  href={`sms:${contact.phone}`}
+                  onClick={() => setMsgState("idle")}
+                  style={{
+                    background: "#10b981", color: "#000", borderRadius: 6,
+                    padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", textDecoration: "none",
+                  }}
+                >
+                  Confirm
+                </a>
+                <button
+                  onClick={() => setMsgState("idle")}
+                  style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer" }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <WarmthBadge level={warmth} />
         </div>
       </div>
+
+      {contact.assignedTo && (
+        <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6, fontWeight: 600 }}>
+          👤 {contact.assignedTo}
+        </div>
+      )}
 
       {contact.brokerage && (
         <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>

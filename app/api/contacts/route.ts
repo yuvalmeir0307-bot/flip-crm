@@ -45,6 +45,7 @@ export async function PATCH(req: NextRequest) {
   if (properties.notes !== undefined) notionProps["Notes"] = { rich_text: [{ text: { content: properties.notes } }] };
   if (properties.warmth) notionProps["Warmth"] = { select: { name: properties.warmth } };
   if (properties.followUpDate) notionProps["Follow Up Date"] = { date: { start: properties.followUpDate } };
+  if (properties.assignedTo !== undefined) notionProps["Assigned To"] = { rich_text: [{ text: { content: properties.assignedTo } }] };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });
