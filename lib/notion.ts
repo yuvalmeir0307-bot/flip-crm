@@ -40,11 +40,30 @@ export async function updateContact(pageId: string, properties: Record<string, u
 }
 
 export async function findContactByPhone(phone: string) {
+  // First: exact match on primary Phone field
   const res = await notion.databases.query({
     database_id: DB_ID,
     filter: { property: "Phone", phone_number: { equals: phone } },
   });
-  return res.results[0] ?? null;
+  if (res.results[0]) return res.results[0];
+
+  // Second: check Alt Phones field (comma-separated E.164 numbers)
+  const digits = phone.replace(/\D/g, "");
+  const altRes = await notion.databases.query({
+    database_id: DB_ID,
+    filter: { property: "Alt Phones", rich_text: { contains: digits.slice(-10) } },
+  });
+  // Verify the match is exact (not a partial substring hit)
+  for (const page of altRes.results) {
+    const props = (page as { properties: Record<string, { rich_text?: Array<{ plain_text: string }> }> }).properties;
+    const altText = props["Alt Phones"]?.rich_text?.[0]?.plain_text ?? "";
+    const altNumbers = altText.split(",").map((n: string) => n.trim());
+    if (altNumbers.some((n: string) => n === phone || n.replace(/\D/g, "").slice(-10) === digits.slice(-10))) {
+      return page;
+    }
+  }
+
+  return null;
 }
 
 export async function createContact(data: {
@@ -255,5 +274,6 @@ export function extractContactProps(page: Record<string, unknown>) {
     warmth: props.Warmth?.select?.name ?? "",
     followUpDate: props["Follow Up Date"]?.date?.start ?? null,
     assignedTo: props["Assigned To"]?.rich_text?.[0]?.plain_text ?? "",
+    altPhones: props["Alt Phones"]?.rich_text?.[0]?.plain_text ?? "",
   };
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 
 type Contact = {
-  id: string; name: string; phone: string; status: string;
+  id: string; name: string; phone: string; altPhones: string; status: string;
   dripStep: number; poolStep: number; date: string | null;
   lastContact: string | null; lastReply: string;
   email: string; brokerage: string; area: string; source: string;
@@ -147,6 +147,7 @@ function ContactDetailModal({ contact, onClose, onStatusChange }: {
         {/* Info grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20, background: "#141414", borderRadius: 10, padding: 16 }}>
           <InfoField label="Phone" value={contact.phone} />
+          <InfoField label="Alt Phones" value={contact.altPhones ? contact.altPhones.split(",").join(", ") : ""} />
           <InfoField label="Email" value={contact.email} />
           <InfoField label="Brokerage" value={contact.brokerage} />
           <InfoField label="Area" value={contact.area} />
@@ -294,7 +295,7 @@ export default function ContactsPage() {
   }
 
   const filtered = contacts.filter((c) => {
-    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || (c.altPhones && c.altPhones.includes(search));
     const matchStatus = !filterStatus || c.status === filterStatus;
     return matchSearch && matchStatus;
   });

@@ -3,3 +3,7 @@ node_modules
 .next
 .env.local
 *.env
+
+CLAUDE.md
+.claude/
+tsconfig.tsbuildinfo
