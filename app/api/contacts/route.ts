@@ -32,6 +32,18 @@ export async function PATCH(req: NextRequest) {
       notionProps["Drip step"] = { number: 0 };
       notionProps["Pool step"] = { number: 0 };
     }
+    // When manually moving to The Pool, set pool step to 1 and Date to 7 days from now
+    // so the first pool follow-up fires at the correct time (not immediately)
+    if (properties.status === "The Pool") {
+      if (properties.poolStep === undefined) {
+        notionProps["Pool step"] = { number: 1 };
+      }
+      if (!properties.date) {
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + 7);
+        notionProps["Date"] = { date: { start: nextDate.toISOString().split("T")[0] } };
+      }
+    }
   }
   if (properties.phone) notionProps["Phone"] = { phone_number: properties.phone };
   if (properties.email) notionProps["Email"] = { email: properties.email };

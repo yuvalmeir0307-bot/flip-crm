@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveContacts, updateContact, extractContactProps, createRunLog } from "@/lib/notion";
-import { sendSMS, getSender, getSenderName } from "@/lib/openphone";
+import { sendSMS, getSender, getSenderName, getSenderByName } from "@/lib/openphone";
 import {
   getDripScript,
   getPoolScript,
@@ -66,8 +66,10 @@ export async function GET(req: NextRequest) {
     }
 
     const firstName = contact.name.split(" ")[0] || "there";
-    const senderPhone = getSender(i);
-    const senderName = getSenderName(i);
+    // Prefer assignedTo so pool follow-ups always use the agent who originally talked to this contact
+    const knownAgent = contact.assignedTo === "Yuval" || contact.assignedTo === "Yahav";
+    const senderName = knownAgent ? contact.assignedTo : getSenderName(i);
+    const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(i);
 
     // Try to get script from Notion, fallback to hardcoded
     let message: string;
@@ -118,6 +120,10 @@ export async function GET(req: NextRequest) {
         const nextStep = currentStep >= 9 ? 5 : currentStep + 1;
         updateProps["Pool step"] = { number: nextStep };
       } else {
+        // Record which agent sent the drip so pool follow-ups use the same phone
+        if (!contact.assignedTo) {
+          updateProps["Assigned To"] = { rich_text: [{ text: { content: senderName } }] };
+        }
         if (currentStep >= 4) {
           updateProps["Status"] = { select: { name: "The Pool" } };
           updateProps["Pool step"] = { number: 1 };

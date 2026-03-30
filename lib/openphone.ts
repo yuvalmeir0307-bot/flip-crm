@@ -11,6 +11,13 @@ export function getSenderName(index: number): string {
   return index % 2 === 0 ? "Yuval" : "Yahav";
 }
 
+// Resolve phone by agent name (used for pool follow-ups where assignedTo is known)
+export function getSenderByName(name: string): string {
+  if (name.toLowerCase().includes("yuval")) return YUVAL;
+  if (name.toLowerCase().includes("yahav")) return YAHAV;
+  return YUVAL;
+}
+
 export async function sendSMS(to: string, body: string, from: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   try {
     const res = await fetch("https://api.openphone.com/v1/messages", {
