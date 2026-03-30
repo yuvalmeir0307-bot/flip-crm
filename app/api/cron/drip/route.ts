@@ -120,10 +120,6 @@ export async function GET(req: NextRequest) {
         const nextStep = currentStep >= 9 ? 5 : currentStep + 1;
         updateProps["Pool step"] = { number: nextStep };
       } else {
-        // Record which agent sent the drip so pool follow-ups use the same phone
-        if (!contact.assignedTo) {
-          updateProps["Assigned To"] = { rich_text: [{ text: { content: senderName } }] };
-        }
         if (currentStep >= 4) {
           updateProps["Status"] = { select: { name: "The Pool" } };
           updateProps["Pool step"] = { number: 1 };
@@ -133,6 +129,15 @@ export async function GET(req: NextRequest) {
       }
 
       await updateContact(contact.id, updateProps);
+
+      // Best-effort: record which agent sent the drip (field may not exist yet)
+      if (!isPool && !contact.assignedTo) {
+        try {
+          await updateContact(contact.id, {
+            "Assigned To": { rich_text: [{ text: { content: senderName } }] },
+          });
+        } catch { /* ignore if Assigned To field not yet created in Notion */ }
+      }
       logs.push(`✅ Sent & updated Notion`);
     } else {
       logs.push(`❌ Failed: ${result.error}`);

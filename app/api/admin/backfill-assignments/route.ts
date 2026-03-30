@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Client } from "@notionhq/client";
 import { getAllContacts, getAllRunLogs, updateContact, extractContactProps } from "@/lib/notion";
+
+const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
+const DB_ID = process.env.NOTION_DATABASE_ID!;
+
+async function ensureAssignedToProperty() {
+  const db = await notion.databases.retrieve({ database_id: DB_ID });
+  if (!("Assigned To" in (db as { properties: Record<string, unknown> }).properties)) {
+    await notion.databases.update({
+      database_id: DB_ID,
+      properties: { "Assigned To": { rich_text: {} } },
+    } as Parameters<typeof notion.databases.update>[0]);
+  }
+}
 
 /**
  * POST /api/admin/backfill-assignments
@@ -19,6 +33,9 @@ export async function POST(req: NextRequest) {
   if (authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // 0. Ensure the Assigned To field exists in the Notion database
+  await ensureAssignedToProperty();
 
   // 1. Load all run logs (oldest first — getAllRunLogs sorts ascending)
   const runLogs = await getAllRunLogs();
