@@ -151,6 +151,36 @@ export type RunLog = {
   error: string;
 };
 
+export async function getAllRunLogs(): Promise<RunLog[]> {
+  if (!RUNS_DB_ID) return [];
+  const results: RunLog[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.databases.query({
+      database_id: RUNS_DB_ID,
+      sorts: [{ property: "Date", direction: "ascending" }],
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    results.push(...res.results.map((p) => {
+      const props = (p as { properties: Record<string, Record<string, unknown>> }).properties;
+      return {
+        id: (p as { id: string }).id,
+        date: (props.Date?.date as { start: string })?.start ?? "",
+        type: ((props.Type?.select as { name: string })?.name) ?? "Drip",
+        contactName: ((props.Name?.title as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+        phone: ((props.Phone?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+        step: ((props.Step?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+        status: ((props.Status?.select as { name: string })?.name === "failed" ? "failed" : "success") as "success" | "failed",
+        message: ((props.Message?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+        error: ((props.Error?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+      };
+    }));
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+  return results;
+}
+
 export async function getRunLogs(limit = 50): Promise<RunLog[]> {
   if (!RUNS_DB_ID) return [];
   const res = await notion.databases.query({
