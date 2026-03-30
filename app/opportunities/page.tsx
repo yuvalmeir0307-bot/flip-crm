@@ -1078,9 +1078,176 @@ function DealCard({ contact, onSave, onStatusChange }: {
   );
 }
 
+type InsightPeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+function InsightsPanel({ allContacts }: { allContacts: Contact[] }) {
+  const [period, setPeriod] = useState<InsightPeriod>("weekly");
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  function getPeriodEnd(): Date {
+    const d = new Date(today);
+    if (period === "daily") d.setDate(d.getDate() + 1);
+    else if (period === "weekly") d.setDate(d.getDate() + 7);
+    else if (period === "monthly") d.setMonth(d.getMonth() + 1);
+    else d.setFullYear(d.getFullYear() + 1);
+    return d;
+  }
+
+  function getPeriodStart(): Date {
+    const d = new Date(today);
+    if (period === "daily") { /* today */ }
+    else if (period === "weekly") d.setDate(d.getDate() - 7);
+    else if (period === "monthly") d.setMonth(d.getMonth() - 1);
+    else d.setFullYear(d.getFullYear() - 1);
+    return d;
+  }
+
+  const periodStart = getPeriodStart();
+  const periodEnd = getPeriodEnd();
+
+  const followUpsInPeriod = allContacts.filter((c) => {
+    if (!c.followUpDate) return false;
+    const d = new Date(c.followUpDate + "T12:00:00");
+    return d >= today && d < periodEnd;
+  });
+
+  const overdueFollowUps = allContacts.filter((c) => {
+    if (!c.followUpDate) return false;
+    const d = new Date(c.followUpDate + "T12:00:00");
+    return d < today;
+  });
+
+  const hotLeads = allContacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT");
+  const potentialDeals = allContacts.filter((c) => c.status === "Potential Deal");
+  const hotWarmth = allContacts.filter((c) => c.warmth === "Hot");
+  const warmWarmth = allContacts.filter((c) => c.warmth === "Warm");
+  const coldWarmth = allContacts.filter((c) => c.warmth === "Cold");
+
+  const periodLabel = period === "daily" ? "Today" : period === "weekly" ? "This Week" : period === "monthly" ? "This Month" : "This Year";
+
+  const PERIODS: { key: InsightPeriod; label: string }[] = [
+    { key: "daily", label: "Daily" },
+    { key: "weekly", label: "Weekly" },
+    { key: "monthly", label: "Monthly" },
+    { key: "yearly", label: "Yearly" },
+  ];
+
+  return (
+    <div>
+      {/* Period Selector */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        {PERIODS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setPeriod(p.key)}
+            style={{
+              padding: "7px 18px",
+              borderRadius: 20,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              border: "1px solid",
+              background: period === p.key ? "#6366f1" : "transparent",
+              color: period === p.key ? "#fff" : "#6b7280",
+              borderColor: period === p.key ? "#6366f1" : "#e5e7eb",
+              transition: "all 0.15s",
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Stat Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+        {[
+          { label: "Hot Leads", value: hotLeads.length, color: "#f97316", sub: "Replied — pivot call needed" },
+          { label: "Potential Deals", value: potentialDeals.length, color: "#10b981", sub: "Active deal pipeline" },
+          { label: `Follow-Ups (${periodLabel})`, value: followUpsInPeriod.length, color: "#6366f1", sub: `Scheduled in this ${period}` },
+          { label: "Overdue Follow-Ups", value: overdueFollowUps.length, color: overdueFollowUps.length > 0 ? "#ef4444" : "#10b981", sub: "Past due date" },
+          { label: "Hot Warmth", value: hotWarmth.length, color: "#fb923c", sub: "Contacts marked Hot" },
+          { label: "Warm Warmth", value: warmWarmth.length, color: "#a78bfa", sub: "Contacts marked Warm" },
+        ].map((s) => (
+          <div key={s.label} style={{
+            background: "#1a1a1a", borderRadius: 14, padding: "20px 22px",
+            border: "1px solid #222",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+              {s.label}
+            </div>
+            <div style={{ fontSize: 42, fontWeight: 800, color: s.color, lineHeight: 1, letterSpacing: "-1px" }}>
+              {s.value}
+            </div>
+            <div style={{ fontSize: 12, color: "#555", marginTop: 6 }}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Conversion Rate */}
+      <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "20px 22px", border: "1px solid #222", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
+          Pipeline Overview — {periodLabel}
+        </div>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {[
+            { label: "Hot → Deal Rate", num: potentialDeals.length, den: hotLeads.length + potentialDeals.length, color: "#10b981" },
+            { label: "Overdue Rate", num: overdueFollowUps.length, den: allContacts.filter(c => c.followUpDate).length, color: "#ef4444" },
+            { label: "Warm/Hot Coverage", num: hotWarmth.length + warmWarmth.length, den: allContacts.length, color: "#a78bfa" },
+          ].map(({ label, num, den, color }) => {
+            const pct = den === 0 ? 0 : Math.round((num / den) * 100);
+            return (
+              <div key={label} style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: "#888" }}>{label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color }}>{pct}%</span>
+                </div>
+                <div style={{ background: "#2a2a2a", borderRadius: 4, height: 5, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.4s" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Upcoming Follow-Ups */}
+      {followUpsInPeriod.length > 0 && (
+        <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "20px 22px", border: "1px solid #222" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
+            Upcoming Follow-Ups — {periodLabel}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {followUpsInPeriod.slice(0, 10).map((c) => (
+              <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: 13, color: "#ddd", fontWeight: 600 }}>{c.name}</span>
+                  {c.brokerage && <span style={{ fontSize: 12, color: "#555", marginLeft: 8 }}>{c.brokerage}</span>}
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <WarmthBadge level={c.warmth} />
+                  <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                    {new Date(c.followUpDate! + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {followUpsInPeriod.length > 10 && (
+              <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>+{followUpsInPeriod.length - 10} more</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OpportunitiesPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"opportunities" | "insights">("opportunities");
 
   useEffect(() => { load(); }, []);
 
@@ -1088,6 +1255,7 @@ export default function OpportunitiesPage() {
     setLoading(true);
     const res = await fetch("/api/contacts");
     const all: Contact[] = await res.json();
+    setAllContacts(all);
     setContacts(all.filter((c) =>
       c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Potential Deal"
     ));
@@ -1115,21 +1283,52 @@ export default function OpportunitiesPage() {
   const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT");
   const dealContacts = contacts.filter((c) => c.status === "Potential Deal");
 
+  const TABS = [
+    { key: "opportunities" as const, label: "Opportunities" },
+    { key: "insights" as const, label: "Insights" },
+  ];
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
       <Sidebar />
       <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Opportunities</h1>
           <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>
             {hotContacts.length} replied · {dealContacts.length} potential deals
           </p>
         </div>
 
+        {/* Tab Bar */}
+        <div style={{ display: "flex", gap: 0, marginBottom: 28, borderBottom: "1px solid #e5e7eb" }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: "10px 22px",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "none",
+                background: "none",
+                color: activeTab === tab.key ? "#111827" : "#9ca3af",
+                borderBottom: activeTab === tab.key ? "2px solid #111827" : "2px solid transparent",
+                marginBottom: -1,
+                transition: "all 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <p style={{ color: "#555", fontSize: 14 }}>Loading...</p>
+        ) : activeTab === "insights" ? (
+          <InsightsPanel allContacts={allContacts} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
 
