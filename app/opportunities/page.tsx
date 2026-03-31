@@ -529,7 +529,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
       const res = await fetch("/api/qualify-call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: contact.phone }),
+        body: JSON.stringify({ phone: contact.phone, altPhones: contact.altPhones }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -804,7 +804,7 @@ function DealCard({ contact, onSave, onStatusChange }: {
       const res = await fetch("/api/analyze-call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: contact.phone }),
+        body: JSON.stringify({ phone: contact.phone, altPhones: contact.altPhones }),
       });
       const data = await res.json();
       if (!res.ok) {

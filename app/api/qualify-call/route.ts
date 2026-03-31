@@ -4,12 +4,17 @@ import { fetchLatestCallContent } from "@/lib/openphone-transcript";
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone } = await req.json();
+    const { phone, altPhones } = await req.json();
     if (!phone) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
     }
 
-    const result = await fetchLatestCallContent(phone);
+    // Try main phone first, then each alt phone until we find a call
+    const phonesToTry = [phone, ...(altPhones ? altPhones.split(",").map((p: string) => p.trim()).filter(Boolean) : [])];
+    let result = await fetchLatestCallContent(phonesToTry[0]);
+    for (let i = 1; i < phonesToTry.length && !result.ok; i++) {
+      result = await fetchLatestCallContent(phonesToTry[i]);
+    }
 
     if (!result.ok) {
       return NextResponse.json(
