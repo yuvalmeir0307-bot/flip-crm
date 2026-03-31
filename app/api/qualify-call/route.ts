@@ -4,7 +4,14 @@ import { fetchLatestCallContent } from "@/lib/openphone-transcript";
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone, altPhones } = await req.json();
+    const { phone, altPhones, transcript: manualTranscript } = await req.json();
+
+    // If user provided a manual transcript, analyze it directly (no OpenPhone needed)
+    if (manualTranscript) {
+      const analysis = await analyzeQualificationCall(manualTranscript);
+      return NextResponse.json({ ok: true, analysis, source: "manual" });
+    }
+
     if (!phone) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
     }

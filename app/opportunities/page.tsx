@@ -768,10 +768,36 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
   const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
-  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error" | "manual">("idle");
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeSetupUrl, setAnalyzeSetupUrl] = useState("");
   const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+  const [manualTranscript, setManualTranscript] = useState("");
+
+  async function analyzeManualTranscript() {
+    if (!manualTranscript.trim()) return;
+    setAnalyzeState("loading");
+    try {
+      const res = await fetch("/api/analyze-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: manualTranscript }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnalyzeState("error");
+        setAnalyzeError(data.error ?? "Analysis failed");
+        setTimeout(() => setAnalyzeState("idle"), 8000);
+      } else {
+        setAnalysis(data.analysis);
+        setAnalyzeState("done");
+      }
+    } catch {
+      setAnalyzeState("error");
+      setAnalyzeError("Network error");
+      setTimeout(() => setAnalyzeState("idle"), 8000);
+    }
+  }
 
   async function initiateCall() {
     setCallState("calling");
@@ -809,10 +835,9 @@ function DealCard({ contact, onSave, onStatusChange }: {
       });
       const data = await res.json();
       if (!res.ok) {
-        setAnalyzeState("error");
+        // Show manual transcript input instead of a timed error
+        setAnalyzeState("manual");
         setAnalyzeError(data.error ?? "Analysis failed");
-        if (data.setupUrl) setAnalyzeSetupUrl(data.setupUrl);
-        setTimeout(() => setAnalyzeState("idle"), 8000);
       } else {
         setAnalysis(data.analysis);
         setAnalyzeState("done");
@@ -1063,13 +1088,48 @@ function DealCard({ contact, onSave, onStatusChange }: {
             {analyzeState === "error" && (
               <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center", maxWidth: 240 }}>
                 ✗ {analyzeError}
-                {analyzeSetupUrl && (
-                  <a href={analyzeSetupUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ marginLeft: 6, color: "#38bdf8", textDecoration: "underline" }}>
-                    Enable recording →
-                  </a>
-                )}
               </span>
+            )}
+            {analyzeState === "manual" && (
+              <div style={{ width: "100%", marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6 }}>
+                  No recording found. Paste your call notes below to analyze:
+                </div>
+                <textarea
+                  value={manualTranscript}
+                  onChange={(e) => setManualTranscript(e.target.value)}
+                  rows={4}
+                  placeholder="Paste call transcript or notes here..."
+                  style={{
+                    width: "100%", fontSize: 12, padding: "8px 10px", borderRadius: 8,
+                    background: "#111", border: "1px solid #7c3aed44", color: "#fff",
+                    resize: "vertical", fontFamily: "inherit", marginBottom: 8,
+                  }}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={analyzeManualTranscript}
+                    disabled={!manualTranscript.trim()}
+                    style={{
+                      background: "#7c3aed", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "6px 16px", fontSize: 12,
+                      fontWeight: 700, cursor: manualTranscript.trim() ? "pointer" : "not-allowed",
+                      opacity: manualTranscript.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    Analyze Notes
+                  </button>
+                  <button
+                    onClick={() => { setAnalyzeState("idle"); setManualTranscript(""); }}
+                    style={{
+                      background: "#2a2a2a", color: "#888", border: "1px solid #333",
+                      borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}
