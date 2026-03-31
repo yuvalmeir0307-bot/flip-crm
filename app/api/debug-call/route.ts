@@ -20,23 +20,20 @@ export async function GET(req: Request) {
     if (calls.length > 0) {
       const callId = calls[0].id;
 
-      // Check recording endpoint
       const recRes = await fetch(`https://api.openphone.com/v1/call-recordings/${callId}`, { headers: HEADERS });
-      const recData = recRes.ok ? await recRes.json() : { status: recRes.status, error: await recRes.text().substring(0, 300) };
+      const recBody = recRes.ok ? await recRes.json() : { status: recRes.status, error: (await recRes.text()).substring(0, 300) };
 
-      // Check transcript
       const txRes = await fetch(`https://api.openphone.com/v1/call-transcripts/${callId}`, { headers: HEADERS });
-      const txData = txRes.ok ? await txRes.json() : { status: txRes.status };
+      const txBody = txRes.ok ? await txRes.json() : { status: txRes.status };
 
-      // Check summary
       const sumRes = await fetch(`https://api.openphone.com/v1/call-summaries/${callId}`, { headers: HEADERS });
-      const sumData = sumRes.ok ? await sumRes.json() : { status: sumRes.status };
+      const sumBody = sumRes.ok ? await sumRes.json() : { status: sumRes.status };
 
       return NextResponse.json({
         call: calls[0],
-        recording: recData,
-        transcript: txData,
-        summary: sumData,
+        recording: recBody,
+        transcript: txBody,
+        summary: sumBody,
       });
     }
   }
