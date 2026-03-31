@@ -9,31 +9,40 @@ const HEADERS = {
 };
 
 export async function GET() {
-  // Get all phone numbers and their full details
-  const res = await fetch("https://api.openphone.com/v1/phone-numbers", {
-    headers: HEADERS,
-  });
-  const data = await res.json();
-
-  // Try to patch each number to enable recording
-  const results = [];
-  for (const pn of data?.data ?? []) {
-    // Try PATCH to enable recording
-    const patchRes = await fetch(`https://api.openphone.com/v1/phone-numbers/${pn.id}`, {
-      method: "PATCH",
+  try {
+    // Get all phone numbers and their full details
+    const res = await fetch("https://api.openphone.com/v1/phone-numbers", {
       headers: HEADERS,
-      body: JSON.stringify({ recordingEnabled: true }),
     });
-    const patchBody = await patchRes.json();
+    if (!res.ok) {
+      return NextResponse.json({ error: await res.text(), status: res.status });
+    }
+    const data = await res.json();
+    const phoneNumbers = data?.data ?? [];
 
-    results.push({
-      id: pn.id,
-      number: pn.number,
-      allFields: pn,
-      patchStatus: patchRes.status,
-      patchResponse: patchBody,
-    });
+    const results = [];
+    for (const pn of phoneNumbers) {
+      // Try PATCH to enable recording
+      const patchRes = await fetch(`https://api.openphone.com/v1/phone-numbers/${pn.id}`, {
+        method: "PATCH",
+        headers: HEADERS,
+        body: JSON.stringify({ recordingEnabled: true }),
+      });
+      const patchText = await patchRes.text();
+      let patchBody;
+      try { patchBody = JSON.parse(patchText); } catch { patchBody = patchText.substring(0, 300); }
+
+      results.push({
+        id: pn.id,
+        number: pn.number ?? pn.phoneNumber,
+        currentFields: Object.keys(pn),
+        patchStatus: patchRes.status,
+        patchResponse: patchBody,
+      });
+    }
+
+    return NextResponse.json(results);
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
-
-  return NextResponse.json(results);
 }
