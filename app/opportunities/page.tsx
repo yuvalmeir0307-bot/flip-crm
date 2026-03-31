@@ -382,6 +382,7 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
+  altPhones: string;
   status: string;
   brokerage: string;
   area: string;
