@@ -7,7 +7,6 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const phone = searchParams.get("phone") ?? "+18472462600";
 
-  // Get phone number IDs
   const pnRes = await fetch("https://api.openphone.com/v1/phone-numbers", { headers: HEADERS });
   const pnData = await pnRes.json();
   const phoneNumbers: { id: string }[] = pnData?.data ?? [];
@@ -19,8 +18,26 @@ export async function GET(req: Request) {
     const data = await res.json();
     const calls = data?.data ?? [];
     if (calls.length > 0) {
-      // Return the FULL call object so we can see all available fields
-      return NextResponse.json({ phoneNumberId: pn.id, calls });
+      const callId = calls[0].id;
+
+      // Check recording endpoint
+      const recRes = await fetch(`https://api.openphone.com/v1/call-recordings/${callId}`, { headers: HEADERS });
+      const recData = recRes.ok ? await recRes.json() : { status: recRes.status, error: await recRes.text().substring(0, 300) };
+
+      // Check transcript
+      const txRes = await fetch(`https://api.openphone.com/v1/call-transcripts/${callId}`, { headers: HEADERS });
+      const txData = txRes.ok ? await txRes.json() : { status: txRes.status };
+
+      // Check summary
+      const sumRes = await fetch(`https://api.openphone.com/v1/call-summaries/${callId}`, { headers: HEADERS });
+      const sumData = sumRes.ok ? await sumRes.json() : { status: sumRes.status };
+
+      return NextResponse.json({
+        call: calls[0],
+        recording: recData,
+        transcript: txData,
+        summary: sumData,
+      });
     }
   }
 
