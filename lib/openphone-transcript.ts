@@ -4,27 +4,56 @@ const OPENPHONE_HEADERS = { Authorization: OPENPHONE_API_KEY };
 type OpenPhoneCall = { id: string; duration?: number; answeredAt?: string };
 
 /**
+ * Returns all phoneNumberIds belonging to this OpenPhone account.
+ * The /v1/calls endpoint now requires phoneNumberId as a mandatory param.
+ */
+async function fetchPhoneNumberIds(): Promise<string[]> {
+  const res = await fetch("https://api.openphone.com/v1/phone-numbers", {
+    headers: OPENPHONE_HEADERS,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenPhone phone-numbers fetch failed: ${res.status} — ${err}`);
+  }
+  const data = await res.json();
+  const numbers: { id: string }[] = data?.data ?? [];
+  return numbers.map((n) => n.id);
+}
+
+/**
  * Fetches the most recent answered call for a given contact phone number.
- * OpenPhone returns calls newest-first, so calls[0] is the latest.
+ * Queries each of your OpenPhone lines (phoneNumberId is now required by the API).
  * We skip calls shorter than 10s (missed / dropped).
  */
 async function fetchLastCall(phone: string): Promise<OpenPhoneCall | null> {
-  const res = await fetch(
-    `https://api.openphone.com/v1/calls?participants[]=${encodeURIComponent(phone)}&maxResults=10`,
-    { headers: OPENPHONE_HEADERS }
-  );
+  const phoneNumberIds = await fetchPhoneNumberIds();
+  if (phoneNumberIds.length === 0) return null;
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenPhone calls fetch failed: ${res.status} — ${err}`);
+  const allCalls: OpenPhoneCall[] = [];
+
+  for (const phoneNumberId of phoneNumberIds) {
+    const url =
+      `https://api.openphone.com/v1/calls` +
+      `?phoneNumberId=${encodeURIComponent(phoneNumberId)}` +
+      `&participants[]=${encodeURIComponent(phone)}` +
+      `&maxResults=10`;
+
+    const res = await fetch(url, { headers: OPENPHONE_HEADERS });
+    if (!res.ok) continue; // skip lines that return errors
+
+    const data = await res.json();
+    const calls: OpenPhoneCall[] = data?.data ?? [];
+    allCalls.push(...calls);
   }
 
-  const data = await res.json();
-  const calls: OpenPhoneCall[] = data?.data ?? [];
-  if (calls.length === 0) return null;
+  if (allCalls.length === 0) return null;
 
-  // Most recent answered call with at least 10 seconds of content
-  return calls.find((c) => c.answeredAt && (c.duration ?? 0) > 10) ?? null;
+  // Sort newest-first (answeredAt desc), then pick the first answered call > 10s
+  allCalls.sort((a, b) =>
+    (b.answeredAt ?? "").localeCompare(a.answeredAt ?? "")
+  );
+
+  return allCalls.find((c) => c.answeredAt && (c.duration ?? 0) > 10) ?? null;
 }
 
 /**
