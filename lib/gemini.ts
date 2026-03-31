@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export type PillarScore = { score: number; evidence: string };
 
@@ -64,6 +64,7 @@ ${transcript}`;
   });
 
   const data = await res.json();
+  if (data?.error) throw new Error(`Gemini API error: ${data.error.message ?? JSON.stringify(data.error)}`);
   const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -131,6 +132,7 @@ ${transcript}`;
   });
 
   const data = await res.json();
+  if (data?.error) throw new Error(`Gemini API error: ${data.error.message ?? JSON.stringify(data.error)}`);
   const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
