@@ -141,6 +141,59 @@ ${transcript}`;
   return JSON.parse(jsonMatch[0]) as QualificationAnalysis;
 }
 
+/**
+ * Transcribes an audio recording URL using Gemini's free audio understanding.
+ * Downloads the audio and sends it inline as base64 to Gemini 2.0 Flash.
+ * Works for files up to ~20MB (typical call recordings are 2-8MB).
+ */
+export async function transcribeAudio(audioUrl: string): Promise<string> {
+  // Download the audio
+  const audioRes = await fetch(audioUrl);
+  if (!audioRes.ok) throw new Error(`Failed to download recording: ${audioRes.status}`);
+
+  const arrayBuffer = await audioRes.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+  // Detect mime type from URL or default to mp3
+  const mimeType = audioUrl.includes(".wav") ? "audio/wav"
+    : audioUrl.includes(".ogg") ? "audio/ogg"
+    : "audio/mpeg";
+
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64,
+            },
+          },
+          {
+            text: `Transcribe this call recording as a dialogue. Format each speaker's turn as:
+Speaker 1: [what they said]
+Speaker 2: [what they said]
+
+If you can identify who is the agent/broker and who is the caller, label them accordingly.
+Transcribe everything said, word for word.`,
+          },
+        ],
+      }],
+      generationConfig: { temperature: 0, maxOutputTokens: 4000 },
+    }),
+  });
+
+  const data = await res.json();
+  if (data?.error) throw new Error(`Gemini transcription error: ${data.error.message ?? JSON.stringify(data.error)}`);
+
+  const transcript: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!transcript) throw new Error("Gemini returned empty transcription");
+
+  return `[Auto-transcribed]\n${transcript}`;
+}
+
 export type ClassifyResult = "HOT" | "NO_DEAL" | "NEUTRAL";
 
 export async function classifyReply(message: string): Promise<ClassifyResult> {

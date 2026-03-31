@@ -1,3 +1,5 @@
+import { transcribeAudio } from "@/lib/gemini";
+
 const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY!;
 const OPENPHONE_HEADERS = { Authorization: OPENPHONE_API_KEY };
 
@@ -96,21 +98,34 @@ async function fetchSummary(callId: string): Promise<string | null> {
   return `[AI Call Summary]\n${summary}`;
 }
 
+/**
+ * Fetches the recording download URL for a call, if available.
+ * Returns null if no recording exists.
+ */
+async function fetchRecordingUrl(callId: string): Promise<string | null> {
+  const res = await fetch(
+    `https://api.openphone.com/v1/call-recordings/${callId}`,
+    { headers: OPENPHONE_HEADERS }
+  );
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const recordings: { url?: string }[] = data?.data ?? [];
+  return recordings[0]?.url ?? null;
+}
+
 export type TranscriptResult =
-  | { ok: true; text: string; source: "transcript" | "summary" }
+  | { ok: true; text: string; source: "transcript" | "summary" | "recording" }
   | { ok: false; error: string; setupUrl: string };
 
 /**
  * Main entry point — call this from API routes.
  *
  * Priority:
- *   1. Full line-by-line transcript (best for analysis)
- *   2. AI call summary (fallback — still useful)
- *   3. Structured error with a direct link to enable recording in the dashboard
- *
- * No additional OpenPhone cost — recording + transcription are included
- * in the Business plan. Enable at:
- * https://app.openphone.com/settings/phone-numbers → select number → Auto-record calls
+ *   1. Full line-by-line transcript (OpenPhone Business plan)
+ *   2. AI call summary (OpenPhone Business plan fallback)
+ *   3. Auto-transcribe recording via Gemini (free — works with any plan that has recording enabled)
+ *   4. Structured error prompting user to enable recording
  */
 export async function fetchLatestCallContent(phone: string): Promise<TranscriptResult> {
   const SETUP_URL = "https://app.openphone.com/settings/phone-numbers";
@@ -133,13 +148,21 @@ export async function fetchLatestCallContent(phone: string): Promise<TranscriptR
   const summary = await fetchSummary(call.id);
   if (summary) return { ok: true, text: summary, source: "summary" };
 
-  // Nothing available — recording likely not enabled
+  // Fall back to auto-transcribing the recording via Gemini (free)
+  const recordingUrl = await fetchRecordingUrl(call.id);
+  if (recordingUrl) {
+    try {
+      const transcribed = await transcribeAudio(recordingUrl);
+      return { ok: true, text: transcribed, source: "recording" };
+    } catch {
+      // Transcription failed, fall through to error
+    }
+  }
+
+  // Nothing available — recording not enabled
   return {
     ok: false,
-    error:
-      "Call found but no transcript or summary available. " +
-      "To fix: go to OpenPhone Settings → Phone Numbers → select your number → enable Auto-record calls. " +
-      "Transcription is included in your Business plan at no extra cost.",
+    error: "Call found but no recording available. Enable Auto-record calls in OpenPhone Settings → Phone Numbers → select your number.",
     setupUrl: SETUP_URL,
   };
 }
