@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
 import { classifyReply } from "@/lib/gemini";
 import { STATUS_HOT, STATUS_NO_DEAL } from "@/lib/drip";
+import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,13 @@ export async function POST(req: NextRequest) {
     if (!page) return NextResponse.json({ ok: true });
 
     const contact = extractContactProps(page as Record<string, unknown>);
+
+    // Sync the contact's name from Flip CRM to OpenPhone on every reply
+    if (contact.name) {
+      syncContactToOpenPhone(phone, contact.name).catch((e) =>
+        console.error("[webhook] syncContactToOpenPhone failed:", e)
+      );
+    }
 
     if (contact.status !== "Drip Active" && contact.status !== "The Pool") {
       return NextResponse.json({ ok: true });
