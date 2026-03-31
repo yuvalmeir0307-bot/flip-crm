@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY!;
 const HEADERS = {
   Authorization: OPENPHONE_API_KEY,
