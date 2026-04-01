@@ -16,6 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
   "Drip Active": "#00e5ff",
   "The Pool": "#a855f7",
   "Replied - Pivot Call Needed - HOT": "#f97316",
+  "Replied": "#fbbf24",
   "Potential Deal": "#10b981",
   "Offer Submitted": "#facc15",
   "No Deal - Auto Reply": "#ef4444",
@@ -27,6 +28,7 @@ const STATUS_SHORT: Record<string, string> = {
   "Drip Active": "Drip Active",
   "The Pool": "The Pool",
   "Replied - Pivot Call Needed - HOT": "Hot",
+  "Replied": "Replied",
   "Potential Deal": "Potential Deal",
   "Offer Submitted": "Offer",
   "No Deal - Auto Reply": "No Deal",
@@ -36,7 +38,7 @@ const STATUS_SHORT: Record<string, string> = {
 
 const ALL_STATUSES = [
   "Drip Active", "The Pool", "Replied - Pivot Call Needed - HOT",
-  "Potential Deal", "Offer Submitted",
+  "Replied", "Potential Deal", "Offer Submitted",
   "No Deal - Auto Reply", "Underwriting", "60-Day Rest",
 ];
 

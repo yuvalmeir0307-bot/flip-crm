@@ -3,7 +3,7 @@ import { transcribeAudio } from "@/lib/gemini";
 const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY!;
 const OPENPHONE_HEADERS = { Authorization: OPENPHONE_API_KEY };
 
-type OpenPhoneCall = { id: string; duration?: number; answeredAt?: string };
+type OpenPhoneCall = { id: string; duration?: number; answeredAt?: string; from?: string; to?: string };
 
 /**
  * Returns all phoneNumberIds belonging to this OpenPhone account.
@@ -115,7 +115,7 @@ async function fetchRecordingUrl(callId: string): Promise<string | null> {
 }
 
 export type TranscriptResult =
-  | { ok: true; text: string; source: "transcript" | "summary" | "recording" }
+  | { ok: true; text: string; source: "transcript" | "summary" | "recording"; callMeta?: { duration: number; answeredAt: string } }
   | { ok: false; error: string; setupUrl: string };
 
 /**
@@ -140,20 +140,22 @@ export async function fetchLatestCallContent(phone: string): Promise<TranscriptR
     };
   }
 
+  const callMeta = { duration: call.duration ?? 0, answeredAt: call.answeredAt ?? "" };
+
   // Try full transcript first
   const transcript = await fetchTranscript(call.id);
-  if (transcript) return { ok: true, text: transcript, source: "transcript" };
+  if (transcript) return { ok: true, text: transcript, source: "transcript", callMeta };
 
   // Fall back to AI summary
   const summary = await fetchSummary(call.id);
-  if (summary) return { ok: true, text: summary, source: "summary" };
+  if (summary) return { ok: true, text: summary, source: "summary", callMeta };
 
   // Fall back to auto-transcribing the recording via Gemini (free)
   const recordingUrl = await fetchRecordingUrl(call.id);
   if (recordingUrl) {
     try {
       const transcribed = await transcribeAudio(recordingUrl);
-      return { ok: true, text: transcribed, source: "recording" };
+      return { ok: true, text: transcribed, source: "recording", callMeta };
     } catch {
       // Transcription failed, fall through to error
     }

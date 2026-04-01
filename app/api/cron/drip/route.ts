@@ -67,8 +67,12 @@ export async function GET(req: NextRequest) {
 
     const firstName = contact.name.split(" ")[0] || "there";
     // Prefer assignedTo so pool follow-ups always use the agent who originally talked to this contact
-    const knownAgent = contact.assignedTo === "Yuval" || contact.assignedTo === "Yahav";
-    const senderName = knownAgent ? contact.assignedTo : getSenderName(i);
+    // Case-insensitive check to handle variations (lowercase, trailing spaces, "Both", etc.)
+    const assignedLower = (contact.assignedTo ?? "").toLowerCase().trim();
+    const isYuval = assignedLower.includes("yuval");
+    const isYahav = assignedLower.includes("yahav");
+    const knownAgent = isYuval || isYahav;
+    const senderName = knownAgent ? (isYuval ? "Yuval" : "Yahav") : getSenderName(i);
     const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(i);
 
     // Try to get script from Notion, fallback to hardcoded
