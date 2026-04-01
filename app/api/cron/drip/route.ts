@@ -134,8 +134,8 @@ export async function GET(req: NextRequest) {
 
       await updateContact(contact.id, updateProps);
 
-      // Best-effort: record which agent sent the drip (field may not exist yet)
-      if (!isPool && !contact.assignedTo) {
+      // Best-effort: record which agent sent this message (drip or pool) so future sends stay consistent
+      if (!contact.assignedTo) {
         try {
           await updateContact(contact.id, {
             "Assigned To": { rich_text: [{ text: { content: senderName } }] },

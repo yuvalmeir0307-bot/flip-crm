@@ -1589,7 +1589,7 @@ export default function OpportunitiesPage() {
     const all: Contact[] = await res.json();
     setAllContacts(all);
     setContacts(all.filter((c) =>
-      c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Potential Deal"
+      c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied" || c.status === "Potential Deal"
     ));
     setLoading(false);
   }
@@ -1612,7 +1612,7 @@ export default function OpportunitiesPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, ...data } : c));
   }
 
-  const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT");
+  const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied");
   const dealContacts = contacts.filter((c) => c.status === "Potential Deal");
 
   const TABS = [
@@ -1629,7 +1629,7 @@ export default function OpportunitiesPage() {
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Opportunities</h1>
           <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>
-            {hotContacts.length} replied · {dealContacts.length} potential deals
+            {contacts.filter(c => c.status === "Replied - Pivot Call Needed - HOT").length} hot · {contacts.filter(c => c.status === "Replied").length} replied · {dealContacts.length} potential deals
           </p>
         </div>
 
