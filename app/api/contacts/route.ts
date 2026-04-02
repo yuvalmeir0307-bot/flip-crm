@@ -59,6 +59,14 @@ export async function PATCH(req: NextRequest) {
   if (properties.followUpDate) notionProps["Follow Up Date"] = { date: { start: properties.followUpDate } };
   if (properties.assignedTo !== undefined) notionProps["Assigned To"] = { rich_text: [{ text: { content: properties.assignedTo } }] };
   if (properties.altPhones !== undefined) notionProps["Alt Phones"] = { rich_text: [{ text: { content: properties.altPhones } }] };
+  if (properties.arv !== undefined) notionProps["ARV"] = { number: properties.arv };
+  if (properties.rehabCost !== undefined) notionProps["Rehab Cost"] = { number: properties.rehabCost };
+  if (properties.monthlyRent !== undefined) notionProps["Monthly Rent"] = { number: properties.monthlyRent };
+  if (properties.dealMode !== undefined) notionProps["Deal Mode"] = { select: { name: properties.dealMode } };
+  if (properties.flipFactor !== undefined) notionProps["Flip Factor"] = { number: properties.flipFactor };
+  if (properties.capRate !== undefined) notionProps["Cap Rate"] = { number: properties.capRate };
+  if (properties.expenseRatio !== undefined) notionProps["Expense Ratio"] = { number: properties.expenseRatio };
+  if (properties.maoOverride !== undefined) notionProps["MAO Override"] = properties.maoOverride !== null ? { number: properties.maoOverride } : { number: null };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });

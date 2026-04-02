@@ -391,6 +391,14 @@ type Contact = {
   warmth: string;
   followUpDate: string | null;
   assignedTo: string;
+  arv?: number;
+  rehabCost?: number;
+  monthlyRent?: number;
+  dealMode?: "flip" | "rental";
+  flipFactor?: number;
+  capRate?: number;
+  expenseRatio?: number;
+  maoOverride?: number | null;
 };
 
 const WARMTH_OPTIONS = ["Cold", "Warm", "Hot"];
@@ -755,6 +763,248 @@ function HotCard({ contact, onStatusChange, onSave }: {
   );
 }
 
+function formatCurrency(val: number): string {
+  if (!val || isNaN(val) || !isFinite(val)) return "$0";
+  return "$" + Math.round(val).toLocaleString("en-US");
+}
+
+function MAOSection({ contact, onSave }: {
+  contact: Contact;
+  onSave: (id: string, data: Partial<Contact>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dealMode, setDealMode] = useState<"flip" | "rental">(contact.dealMode ?? "flip");
+  const [arv, setArv] = useState(contact.arv ?? 0);
+  const [rehabCost, setRehabCost] = useState(contact.rehabCost ?? 0);
+  const [monthlyRent, setMonthlyRent] = useState(contact.monthlyRent ?? 0);
+  const [flipFactor, setFlipFactor] = useState(contact.flipFactor ?? 70);
+  const [capRate, setCapRate] = useState(contact.capRate ?? 8);
+  const [expenseRatio, setExpenseRatio] = useState(contact.expenseRatio ?? 40);
+  const [maoOverride, setMaoOverride] = useState<string>(contact.maoOverride != null ? String(contact.maoOverride) : "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const calcFlipMAO = arv * (flipFactor / 100) - rehabCost;
+  const netMonthlyIncome = monthlyRent * (1 - expenseRatio / 100);
+  const netAnnualIncome = netMonthlyIncome * 12;
+  const calcRentalMAO = capRate > 0 ? netAnnualIncome / (capRate / 100) : 0;
+  const calcMAO = dealMode === "flip" ? calcFlipMAO : calcRentalMAO;
+  const finalMAO = maoOverride !== "" ? Number(maoOverride) : calcMAO;
+
+  const flipProfit = arv - finalMAO - rehabCost;
+  const flipProfitPct = (finalMAO + rehabCost) > 0 ? (flipProfit / (finalMAO + rehabCost)) * 100 : 0;
+  const netProfitPct = finalMAO > 0 ? (netAnnualIncome / finalMAO) * 100 : 0;
+
+  const accentColor = "#f59e0b";
+
+  // Preview MAO shown in collapsed header
+  const previewMAO = contact.maoOverride != null
+    ? contact.maoOverride
+    : contact.dealMode === "rental"
+      ? (contact.monthlyRent ?? 0) * 12 * (1 - (contact.expenseRatio ?? 40) / 100) / ((contact.capRate ?? 8) / 100)
+      : (contact.arv ?? 0) * ((contact.flipFactor ?? 70) / 100) - (contact.rehabCost ?? 0);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(contact.id, {
+      arv,
+      rehabCost,
+      monthlyRent,
+      dealMode,
+      flipFactor,
+      capRate,
+      expenseRatio,
+      maoOverride: maoOverride !== "" ? Number(maoOverride) : null,
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", fontSize: 13, padding: "6px 8px", borderRadius: 6,
+    background: "#1a1a1a", border: "1px solid #333", color: "#fff",
+    outline: "none", boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{ background: "#141414", borderRadius: 12, marginBottom: 14, border: `1px solid ${accentColor}33`, overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "none", border: "none", cursor: "pointer" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            💰 MAO Calculator
+          </span>
+          {(contact.arv || contact.maoOverride) ? (
+            <span style={{ background: `${accentColor}22`, color: accentColor, border: `1px solid ${accentColor}44`, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
+              {formatCurrency(previewMAO)}
+            </span>
+          ) : null}
+        </div>
+        <span style={{ fontSize: 16, color: accentColor, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>›</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${accentColor}22` }}>
+          {/* Mode Toggle */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+            {(["flip", "rental"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setDealMode(mode)}
+                style={{
+                  padding: "5px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", border: "1px solid", transition: "all 0.15s",
+                  background: dealMode === mode ? accentColor : "transparent",
+                  color: dealMode === mode ? "#000" : "#888",
+                  borderColor: dealMode === mode ? accentColor : "#333",
+                }}
+              >
+                {mode === "flip" ? "🔨 Flip" : "🏠 Rental"}
+              </button>
+            ))}
+          </div>
+
+          {/* Inputs */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Est. ARV ($)</label>
+              <input type="number" value={arv || ""} onChange={(e) => setArv(Number(e.target.value))} placeholder="250000" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Rehab Cost ($)</label>
+              <input type="number" value={rehabCost || ""} onChange={(e) => setRehabCost(Number(e.target.value))} placeholder="30000" style={inputStyle} />
+            </div>
+            {dealMode === "rental" && (
+              <div>
+                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Monthly Rent ($)</label>
+                <input type="number" value={monthlyRent || ""} onChange={(e) => setMonthlyRent(Number(e.target.value))} placeholder="1500" style={inputStyle} />
+              </div>
+            )}
+          </div>
+
+          {/* Flip Factor Slider */}
+          {dealMode === "flip" && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Rule of %</label>
+                <span style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{flipFactor}%</span>
+              </div>
+              <input type="range" min={50} max={85} step={1} value={flipFactor} onChange={(e) => setFlipFactor(Number(e.target.value))} style={{ width: "100%", accentColor }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555" }}>
+                <span>50%</span><span>85%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Rental Rate Inputs */}
+          {dealMode === "rental" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Expense Ratio (%)</label>
+                <input type="number" min={0} max={100} value={expenseRatio} onChange={(e) => setExpenseRatio(Number(e.target.value))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Target Cap Rate (%)</label>
+                <input type="number" min={1} max={30} step={0.5} value={capRate} onChange={(e) => setCapRate(Number(e.target.value))} style={inputStyle} />
+              </div>
+            </div>
+          )}
+
+          {/* Results */}
+          <div style={{ background: "#0d0d0d", borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${accentColor}22` }}>
+            {dealMode === "flip" ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>ARV × {flipFactor}%</span>
+                  <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{formatCurrency(arv * flipFactor / 100)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>− Rehab Cost</span>
+                  <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>−{formatCurrency(rehabCost)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Calc. MAO</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(calcFlipMAO)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 11, color: "#555" }}>Est. Profit</span>
+                  <span style={{ fontSize: 11, color: flipProfit >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
+                    {formatCurrency(flipProfit)} ({flipProfitPct.toFixed(1)}% ROI)
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>Monthly Rent</span>
+                  <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{formatCurrency(monthlyRent)}/mo</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>Net Monthly ({100 - expenseRatio}% kept)</span>
+                  <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>{formatCurrency(netMonthlyIncome)}/mo</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>Net Annual</span>
+                  <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>{formatCurrency(netAnnualIncome)}/yr</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Calc. MAO ({capRate}% cap)</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(calcRentalMAO)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 11, color: "#555" }}>Net Annual Yield</span>
+                  <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>{netProfitPct.toFixed(1)}%</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* MAO Override */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>
+              MAO Override (optional)
+            </label>
+            <input
+              type="number"
+              value={maoOverride}
+              onChange={(e) => setMaoOverride(e.target.value)}
+              placeholder={`Calc: ${formatCurrency(calcMAO)}`}
+              style={{ ...inputStyle, border: `1px solid ${maoOverride !== "" ? accentColor : "#333"}` }}
+            />
+            {maoOverride !== "" && (
+              <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+                Using override: <span style={{ color: accentColor, fontWeight: 700 }}>{formatCurrency(Number(maoOverride))}</span>
+                <button onClick={() => setMaoOverride("")} style={{ marginLeft: 8, background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 11 }}>✕ clear</button>
+              </div>
+            )}
+          </div>
+
+          {/* Final MAO */}
+          <div style={{ background: `${accentColor}11`, border: `1px solid ${accentColor}44`, borderRadius: 8, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+              Final MAO
+              {maoOverride !== "" && <span style={{ fontSize: 10, color: "#888", marginLeft: 6 }}>(overridden)</span>}
+            </span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: accentColor }}>{formatCurrency(finalMAO)}</span>
+          </div>
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ width: "100%", background: saved ? "#10b981" : accentColor, color: "#000", border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: saving ? 0.7 : 1, transition: "background 0.2s" }}
+          >
+            {saving ? "Saving..." : saved ? "✓ Saved" : "Save to Contact"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DealCard({ contact, onSave, onStatusChange }: {
   contact: Contact;
   onSave: (id: string, data: Partial<Contact>) => void;
@@ -1019,6 +1269,9 @@ function DealCard({ contact, onSave, onStatusChange }: {
           <span style={{ fontSize: 13, color: "#444" }}>No notes</span>
         )}
       </div>
+
+      {/* MAO Calculator */}
+      <MAOSection contact={contact} onSave={onSave} />
 
       {/* Warmth selector (editing only) */}
       {editing && (

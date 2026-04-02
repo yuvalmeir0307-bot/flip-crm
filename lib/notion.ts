@@ -275,5 +275,13 @@ export function extractContactProps(page: Record<string, unknown>) {
     followUpDate: props["Follow Up Date"]?.date?.start ?? null,
     assignedTo: props["Assigned To"]?.rich_text?.[0]?.plain_text ?? "",
     altPhones: props["Alt Phones"]?.rich_text?.[0]?.plain_text ?? "",
+    arv: props["ARV"]?.number ?? undefined,
+    rehabCost: props["Rehab Cost"]?.number ?? undefined,
+    monthlyRent: props["Monthly Rent"]?.number ?? undefined,
+    dealMode: (props["Deal Mode"]?.select?.name as "flip" | "rental") ?? undefined,
+    flipFactor: props["Flip Factor"]?.number ?? undefined,
+    capRate: props["Cap Rate"]?.number ?? undefined,
+    expenseRatio: props["Expense Ratio"]?.number ?? undefined,
+    maoOverride: props["MAO Override"]?.number ?? null,
   };
 }
