@@ -74,6 +74,8 @@ export async function createContact(data: {
   area?: string;
   source?: string;
   status?: string;
+  altPhones?: string;
+  assignedTo?: string;
 }) {
   return notion.pages.create({
     parent: { database_id: DB_ID },
@@ -84,6 +86,8 @@ export async function createContact(data: {
       ...(data.brokerage ? { Brokerage: { rich_text: [{ text: { content: data.brokerage } }] } } : {}),
       ...(data.area ? { Area: { rich_text: [{ text: { content: data.area } }] } } : {}),
       ...(data.source ? { Source: { rich_text: [{ text: { content: data.source } }] } } : {}),
+      ...(data.altPhones ? { "Alt Phones": { rich_text: [{ text: { content: data.altPhones } }] } } : {}),
+      ...(data.assignedTo ? { "Assigned To": { rich_text: [{ text: { content: data.assignedTo } }] } } : {}),
       Status: { select: { name: data.status ?? "Drip Active" } },
       "Drip step": { number: 0 },
     } as Parameters<typeof notion.pages.create>[0]["properties"],
