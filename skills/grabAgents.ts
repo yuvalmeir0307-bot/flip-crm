@@ -81,7 +81,7 @@ function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[] } 
   if (!valid.length) return { primary: "", alts: [] };
 
   const primary = valid[0].e164;
-  const alts = [...new Set(valid.slice(1).map((p) => p.e164).filter((n) => n !== primary))];
+  const alts = Array.from(new Set(valid.slice(1).map((p) => p.e164).filter((n) => n !== primary)));
   return { primary, alts };
 }
 
@@ -242,7 +242,7 @@ export async function grabAndAddAgents(
             area: "Milwaukee, WI",
             source: "Realtor.com",
             status: "Drip Active",
-            altPhones: [...altSet].join(", "),
+            altPhones: Array.from(altSet).join(", "),
             assignedTo,
           });
 
