@@ -36,9 +36,10 @@ type QualificationAnalysis = {
   followUpStrategy: string;
 };
 
-function QualificationModal({ analysis, contactName, onClose, onSave }: {
+function QualificationModal({ analysis, contactName, callMeta, onClose, onSave }: {
   analysis: QualificationAnalysis;
   contactName: string;
+  callMeta?: { duration: number; answeredAt: string };
   onClose: () => void;
   onSave: (notes: string) => void;
 }) {
@@ -92,6 +93,11 @@ Follow-Up: ${analysis.followUpStrategy}`;
             </div>
             <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{contactName}</div>
             <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{analysis.brokerage} · {analysis.market}</div>
+            {callMeta?.answeredAt && (
+              <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>
+                Call: {new Date(callMeta.answeredAt).toLocaleDateString()} · {Math.floor(callMeta.duration / 60)}m {callMeta.duration % 60}s
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{
@@ -201,9 +207,10 @@ Follow-Up: ${analysis.followUpStrategy}`;
   );
 }
 
-function AnalysisModal({ analysis, contactName, onClose, onSave }: {
+function AnalysisModal({ analysis, contactName, callMeta, onClose, onSave }: {
   analysis: DiscoveryAnalysis;
   contactName: string;
+  callMeta?: { duration: number; answeredAt: string };
   onClose: () => void;
   onSave: (warmth: string, notes: string) => void;
 }) {
@@ -259,6 +266,11 @@ Next Steps: ${analysis.nextSteps.join(" | ")}`;
             </div>
             <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{contactName}</div>
             <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{analysis.address}</div>
+            {callMeta?.answeredAt && (
+              <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>
+                Call: {new Date(callMeta.answeredAt).toLocaleDateString()} · {Math.floor(callMeta.duration / 60)}m {callMeta.duration % 60}s
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{
@@ -529,6 +541,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
   const [qualifyError, setQualifyError] = useState("");
   const [qualifySetupUrl, setQualifySetupUrl] = useState("");
   const [qualification, setQualification] = useState<QualificationAnalysis | null>(null);
+  const [qualifyCallMeta, setQualifyCallMeta] = useState<{ duration: number; answeredAt: string } | null>(null);
 
   async function qualifyCall() {
     setQualifyState("loading");
@@ -548,6 +561,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
         setTimeout(() => setQualifyState("idle"), 8000);
       } else {
         setQualification(data.analysis);
+        setQualifyCallMeta(data.callMeta ?? null);
         setQualifyState("done");
       }
     } catch {
@@ -587,6 +601,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
       <QualificationModal
         analysis={qualification}
         contactName={contact.name}
+        callMeta={qualifyCallMeta ?? undefined}
         onClose={() => setQualifyState("idle")}
         onSave={(notes) => onSave(contact.id, { notes })}
       />
@@ -1022,6 +1037,7 @@ function DealCard({ contact, onSave, onStatusChange }: {
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeSetupUrl, setAnalyzeSetupUrl] = useState("");
   const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+  const [analyzeCallMeta, setAnalyzeCallMeta] = useState<{ duration: number; answeredAt: string } | null>(null);
   const [manualTranscript, setManualTranscript] = useState("");
 
   async function analyzeManualTranscript() {
@@ -1090,6 +1106,7 @@ function DealCard({ contact, onSave, onStatusChange }: {
         setAnalyzeError(data.error ?? "Analysis failed");
       } else {
         setAnalysis(data.analysis);
+        setAnalyzeCallMeta(data.callMeta ?? null);
         setAnalyzeState("done");
       }
     } catch {
@@ -1115,6 +1132,7 @@ function DealCard({ contact, onSave, onStatusChange }: {
       <AnalysisModal
         analysis={analysis}
         contactName={contact.name}
+        callMeta={analyzeCallMeta ?? undefined}
         onClose={() => setAnalyzeState("idle")}
         onSave={(newWarmth, newNotes) => {
           setWarmth(newWarmth);
@@ -1571,7 +1589,7 @@ export default function OpportunitiesPage() {
     const all: Contact[] = await res.json();
     setAllContacts(all);
     setContacts(all.filter((c) =>
-      c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Potential Deal"
+      c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied" || c.status === "Potential Deal"
     ));
     setLoading(false);
   }
@@ -1594,7 +1612,7 @@ export default function OpportunitiesPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, ...data } : c));
   }
 
-  const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT");
+  const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied");
   const dealContacts = contacts.filter((c) => c.status === "Potential Deal");
 
   const TABS = [
@@ -1611,7 +1629,7 @@ export default function OpportunitiesPage() {
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Opportunities</h1>
           <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>
-            {hotContacts.length} replied · {dealContacts.length} potential deals
+            {contacts.filter(c => c.status === "Replied - Pivot Call Needed - HOT").length} hot · {contacts.filter(c => c.status === "Replied").length} replied · {dealContacts.length} potential deals
           </p>
         </div>
 

@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const analysis = await analyzeDiscoveryCall(result.text);
-    return NextResponse.json({ ok: true, analysis, source: result.source });
+    return NextResponse.json({ ok: true, analysis, source: result.source, callMeta: result.callMeta });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

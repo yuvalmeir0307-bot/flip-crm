@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
 import { classifyReply } from "@/lib/gemini";
-import { STATUS_HOT, STATUS_NO_DEAL } from "@/lib/drip";
+import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED } from "@/lib/drip";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 
 export async function POST(req: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       const classification = await classifyReply(content);
       if (classification === "NO_DEAL") newStatus = STATUS_NO_DEAL;
       else if (classification === "HOT") newStatus = STATUS_HOT;
-      else return NextResponse.json({ ok: true }); // NEUTRAL - no status change
+      else newStatus = STATUS_REPLIED; // NEUTRAL - mark as Replied for manual review
     }
 
     await updateContact(contact.id, {

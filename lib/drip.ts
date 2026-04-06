@@ -2,6 +2,7 @@ export const STATUS_DRIP = "Drip Active";
 export const STATUS_POOL = "The Pool";
 export const STATUS_HOT = "Replied - Pivot Call Needed - HOT";
 export const STATUS_NO_DEAL = "No Deal - Auto Reply";
+export const STATUS_REPLIED = "Replied";
 
 // Drip: 5 messages over 5 days — Hieu's system
 // Step 0: immediate | Step 1: next day | Step 2: +1 day | Step 3: +1 day | Step 4: +1 day → Pool
