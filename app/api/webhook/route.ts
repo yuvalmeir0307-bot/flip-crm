@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
 import { classifyReply } from "@/lib/gemini";
 import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED, STATUS_POOL, calculateNextDate } from "@/lib/drip";
+import { sendSMS, getSenderByName, getSender } from "@/lib/openphone";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 import { createLog } from "@/lib/logs";
+
+// Pool steps where last message was a relationship builder → trigger pivot
+const RELATIONSHIP_BUILDER_STEPS = new Set([3, 8]); // after step 2 and step 7 are sent
+const PIVOT_MESSAGE = "Thanks for that. What can I buy right now?";
 
 const STOP_KEYWORDS = ["stop", "unsubscribe", "remove me", "opt out", "optout"];
 
@@ -75,6 +80,23 @@ export async function POST(req: NextRequest) {
 
     await updateContact(contact.id, updateProps);
     console.log("[webhook] saved reply for:", contact.name, contact.phone);
+
+    // Auto-pivot after relationship builder reply (Pool steps 2 & 7)
+    if (
+      eventType === "SMS" &&
+      contact.status === "The Pool" &&
+      RELATIONSHIP_BUILDER_STEPS.has(contact.poolStep ?? 0)
+    ) {
+      try {
+        const senderPhone = contact.assignedTo
+          ? getSenderByName(contact.assignedTo)
+          : getSender(0);
+        await sendSMS(contact.phone, PIVOT_MESSAGE, senderPhone);
+        console.log("[webhook] pivot sent to:", contact.name);
+      } catch (e) {
+        console.error("[webhook] pivot send failed:", e);
+      }
+    }
 
     // Detect STOP / unsubscribe requests
     if (eventType === "SMS") {
