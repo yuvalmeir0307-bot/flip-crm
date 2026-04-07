@@ -1,32 +1,33 @@
 /**
  * Skill: grabAgents
  *
- * Pulls real estate agents for the Milwaukee, WI area from homes.com
- * (CoStar-backed, crawler-accessible from Vercel), then adds new agents
- * to the Flip CRM Notion database.
- *
- * Falls back to homelight.com if homes.com yields no results.
+ * Finds real estate agents for the Milwaukee, WI area using Gemini + Google
+ * Search grounding. Uses a dedicated API key (GEMINI_GRAB_KEY) separate from
+ * the main Gemini key used for transcription/classification, so quotas don't
+ * interfere with each other.
  */
 
 import { findContactByPhone, createContact } from "@/lib/notion";
 
-// Milwaukee + ~40-min drive radius slugs for homes.com
-const HOMES_SLUGS = [
-  "milwaukee-wi",
-  "wauwatosa-wi",
-  "west-allis-wi",
-  "brookfield-wi",
-  "waukesha-wi",
-  "menomonee-falls-wi",
-  "new-berlin-wi",
-  "mequon-wi",
-  "oak-creek-wi",
-  "shorewood-wi",
-  "greenfield-wi",
-  "franklin-wi",
-  "glendale-wi",
-  "racine-wi",
-  "grafton-wi",
+const GEMINI_API_KEY = process.env.GEMINI_GRAB_KEY ?? "AIzaSyCGbCWnLPQ9TZBMPxvweiUZL4sta1_YkeE";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+const LOCATIONS = [
+  "Milwaukee, WI",
+  "Wauwatosa, WI",
+  "West Allis, WI",
+  "Brookfield, WI",
+  "Waukesha, WI",
+  "Menomonee Falls, WI",
+  "New Berlin, WI",
+  "Mequon, WI",
+  "Oak Creek, WI",
+  "Shorewood, WI",
+  "Greenfield, WI",
+  "Franklin, WI",
+  "Glendale, WI",
+  "Racine, WI",
+  "Grafton, WI",
 ];
 
 export interface GrabResult {
@@ -35,7 +36,7 @@ export interface GrabResult {
   errors: string[];
 }
 
-interface RawAgent {
+interface GeminiAgent {
   name: string;
   phone: string;
   email?: string;
@@ -43,7 +44,6 @@ interface RawAgent {
   area?: string;
 }
 
-/** Normalize any US phone string to E.164 (+1XXXXXXXXXX) */
 function toE164(raw: string): string {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
@@ -53,138 +53,59 @@ function toE164(raw: string): string {
   return "";
 }
 
-const BROWSER_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Cache-Control": "no-cache",
-};
+async function findAgentsViaGemini(
+  city: string,
+  count: number
+): Promise<{ agents: GeminiAgent[]; error?: string }> {
+  const prompt = `Search for ${count} active real estate agents who work in ${city}.
 
-/** Parse __NEXT_DATA__ from an HTML string */
-function parseNextData(html: string): Record<string, unknown> | null {
-  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-  if (!match) return null;
-  try { return JSON.parse(match[1]); } catch { return null; }
-}
+For each agent find their: full name, direct mobile or personal phone number, email address, and brokerage name.
 
-/** Extract all phone-like strings from any text blob */
-function extractPhones(text: string): string[] {
-  const matches = text.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) ?? [];
-  return [...new Set(matches.map(toE164).filter(p => p.length === 12))];
-}
+Return ONLY a valid JSON array, no markdown, no explanation:
+[
+  {"name": "Full Name", "phone": "+1XXXXXXXXXX", "email": "agent@example.com", "brokerage": "Brokerage Name", "area": "${city}"},
+  ...
+]
 
-/** Fetch agents from homes.com agent search page */
-async function fetchFromHomesPage(slug: string, page: number): Promise<RawAgent[]> {
-  const url = page === 1
-    ? `https://www.homes.com/real-estate-agents/${slug}/`
-    : `https://www.homes.com/real-estate-agents/${slug}/?p=${page}`;
+Rules:
+- Phone must be a direct/mobile number for the agent (not a general brokerage office line)
+- Phone must be in E.164 format (+1XXXXXXXXXX)
+- Only include agents you can confirm exist with a verified phone
+- Do not fabricate — if fewer than ${count} found, return what you have`;
 
   try {
-    const res = await fetch(url, { headers: BROWSER_HEADERS });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const res = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+      }),
+    });
 
-    const nextData = parseNextData(html);
-    if (nextData) {
-      const pageProps = (nextData as { props?: { pageProps?: Record<string, unknown> } })?.props?.pageProps ?? {};
-
-      // Try known paths for homes.com agent list
-      const agents: unknown[] =
-        (pageProps as Record<string, unknown[]>)?.agents ??
-        (pageProps as { data?: Record<string, unknown[]> })?.data?.agents ??
-        (pageProps as { results?: unknown[] })?.results ??
-        (pageProps as { agentResults?: unknown[] })?.agentResults ??
-        [];
-
-      if (agents.length > 0) {
-        return agents.map((a: unknown) => {
-          const agent = a as Record<string, unknown>;
-          const name = String(agent.fullName ?? agent.name ?? agent.agentName ?? "");
-          const rawPhone = String(
-            (agent.phones as Record<string, string>[])?.[0]?.phoneNumber ??
-            agent.phone ?? agent.phoneNumber ?? ""
-          );
-          const phone = toE164(rawPhone);
-          const email = String(agent.email ?? agent.emailAddress ?? "");
-          const brokerage = String(
-            (agent.company as Record<string, string>)?.name ??
-            agent.brokerage ?? agent.brokerageName ?? agent.officeName ?? ""
-          );
-          return { name, phone, email, brokerage, area: slug.replace(/-wi$/, "").replace(/-/g, " ") + ", WI" };
-        }).filter(a => a.name && a.phone.length === 12);
-      }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { agents: [], error: `Gemini HTTP ${res.status}: ${errText.slice(0, 200)}` };
     }
 
-    // Fallback: extract from JSON-LD structured data
-    const jsonLdMatches = html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g);
-    const results: RawAgent[] = [];
-    for (const m of jsonLdMatches) {
-      try {
-        const ld = JSON.parse(m[1]);
-        const items = Array.isArray(ld) ? ld : [ld];
-        for (const item of items) {
-          if (item["@type"] === "RealEstateAgent" || item["@type"] === "Person") {
-            const name = String(item.name ?? "");
-            const rawPhone = String(item.telephone ?? "");
-            const phone = toE164(rawPhone);
-            const email = String(item.email ?? "");
-            const brokerage = String(item.worksFor?.name ?? "");
-            if (name && phone.length === 12) {
-              results.push({ name, phone, email, brokerage });
-            }
-          }
-        }
-      } catch { /* skip */ }
+    const data = await res.json();
+    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    if (!text) {
+      return { agents: [], error: `Gemini empty response` };
     }
-    return results;
-  } catch {
-    return [];
+
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return { agents: [] };
+
+    const agents = JSON.parse(jsonMatch[0]) as GeminiAgent[];
+    return { agents: Array.isArray(agents) ? agents : [] };
+  } catch (e) {
+    return { agents: [], error: `Gemini exception: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
-/** Fetch agents from homelight.com agent search page */
-async function fetchFromHomelightPage(slug: string): Promise<RawAgent[]> {
-  // slug format: "wi/milwaukee"
-  const url = `https://www.homelight.com/real-estate-agents/${slug}`;
-  try {
-    const res = await fetch(url, { headers: BROWSER_HEADERS });
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    const nextData = parseNextData(html);
-    if (!nextData) return [];
-
-    const pageProps = (nextData as { props?: { pageProps?: Record<string, unknown> } })?.props?.pageProps ?? {};
-    const agents: unknown[] =
-      (pageProps as { agents?: unknown[] })?.agents ??
-      (pageProps as { agentProfiles?: unknown[] })?.agentProfiles ??
-      [];
-
-    return agents.map((a: unknown) => {
-      const agent = a as Record<string, unknown>;
-      const name = String(agent.fullName ?? agent.name ?? "");
-      const rawPhone = String(
-        (agent.phone as string) ??
-        (agent.mobilePhone as string) ??
-        ""
-      );
-      const phone = toE164(rawPhone);
-      const email = String(agent.email ?? "");
-      const brokerage = String(
-        (agent.brokerage as Record<string, string>)?.name ??
-        agent.brokerageName ?? ""
-      );
-      return { name, phone, email, brokerage };
-    }).filter(a => a.name && a.phone.length === 12);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Main entry point.
- * Finds `count` new agents (not already in Notion) for the given assignee.
- */
 export async function grabAndAddAgents(
   assignedTo: "Yahav" | "Yuval",
   count = 5
@@ -193,86 +114,48 @@ export async function grabAndAddAgents(
   const skipped: string[] = [];
   const errors: string[] = [];
 
-  // Shuffle locations for variety on each run
-  const slugs = [...HOMES_SLUGS].sort(() => Math.random() - 0.5);
+  const locations = [...LOCATIONS].sort(() => Math.random() - 0.5);
 
-  let totalFetched = 0;
-
-  outer: for (const slug of slugs) {
+  for (const city of locations) {
     if (added.length >= count) break;
 
-    for (let page = 1; page <= 3; page++) {
-      if (added.length >= count) break outer;
+    const needed = count - added.length;
+    const { agents, error } = await findAgentsViaGemini(city, Math.min(needed + 3, 8));
 
-      const agents = await fetchFromHomesPage(slug, page);
-      totalFetched += agents.length;
-
-      if (!agents.length) break; // no more pages for this slug
-
-      for (const agent of agents) {
-        if (added.length >= count) break outer;
-
-        // Skip if already in Notion
-        try {
-          const existing = await findContactByPhone(agent.phone);
-          if (existing) { skipped.push(agent.name); continue; }
-        } catch { /* ignore */ }
-
-        try {
-          await createContact({
-            name: agent.name,
-            phone: agent.phone,
-            email: agent.email ?? "",
-            brokerage: agent.brokerage ?? "",
-            area: agent.area ?? slug.replace(/-wi$/, "").replace(/-/g, " ") + ", WI",
-            source: "Homes.com",
-            status: "Drip Active",
-            altPhones: "",
-            assignedTo,
-          });
-          added.push(agent.name);
-        } catch (e) {
-          errors.push(`${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`);
-        }
-      }
+    if (error) {
+      errors.push(`[${city}] ${error}`);
+      break;
     }
-  }
 
-  // Fallback: try homelight if homes.com returned nothing at all
-  if (totalFetched === 0 && added.length < count) {
-    const hlSlugs = ["wi/milwaukee", "wi/wauwatosa", "wi/brookfield", "wi/waukesha"];
-    for (const hlSlug of hlSlugs) {
+    for (const agent of agents) {
       if (added.length >= count) break;
-      const agents = await fetchFromHomelightPage(hlSlug);
+      if (!agent.name || !agent.phone) continue;
 
-      for (const agent of agents) {
-        if (added.length >= count) break;
-        try {
-          const existing = await findContactByPhone(agent.phone);
-          if (existing) { skipped.push(agent.name); continue; }
-        } catch { /* ignore */ }
-        try {
-          await createContact({
-            name: agent.name,
-            phone: agent.phone,
-            email: agent.email ?? "",
-            brokerage: agent.brokerage ?? "",
-            area: hlSlug.split("/")[1].replace(/-/g, " ") + ", WI",
-            source: "HomeLight",
-            status: "Drip Active",
-            altPhones: "",
-            assignedTo,
-          });
-          added.push(agent.name);
-        } catch (e) {
-          errors.push(`${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`);
-        }
+      const phone = toE164(agent.phone);
+      if (!phone || phone.length !== 12) continue;
+
+      try {
+        const existing = await findContactByPhone(phone);
+        if (existing) { skipped.push(agent.name); continue; }
+      } catch { /* ignore lookup failures */ }
+
+      try {
+        await createContact({
+          name: agent.name,
+          phone,
+          email: agent.email ?? "",
+          brokerage: agent.brokerage ?? "",
+          area: agent.area ?? city,
+          source: "Realtor Search",
+          status: "Drip Active",
+          altPhones: "",
+          assignedTo,
+        });
+        added.push(agent.name);
+      } catch (e) {
+        errors.push(`${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`);
       }
     }
-  }
-
-  if (added.length === 0 && skipped.length === 0 && totalFetched === 0) {
-    errors.push("No agents parsed from homes.com or homelight.com — site structure may have changed");
   }
 
   return { added, skipped, errors };

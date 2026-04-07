@@ -7,3 +7,6 @@ node_modules
 CLAUDE.md
 .claude/
 tsconfig.tsbuildinfo
+
+.env*.local
+.env.production
