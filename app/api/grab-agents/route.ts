@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { grabAndAddAgents } from "@/skills/grabAgents";
 
+export const runtime = "edge";
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { assignedTo, count = 5 } = body as { assignedTo: string; count?: number };
