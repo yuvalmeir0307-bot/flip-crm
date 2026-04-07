@@ -13,6 +13,11 @@ type AlertEntry = {
   id: string; title: string; type: string; phone: string; details: string; resolved: boolean; createdAt: string;
 };
 
+type RunLog = {
+  date: string; type: string; contactName: string; phone: string;
+  step: string; status: string; message: string; error: string;
+};
+
 const STATUS_COLORS: Record<string, string> = {
   "Drip Active": "#00e5ff",
   "The Pool": "#a855f7",
@@ -66,6 +71,7 @@ export default function Dashboard() {
   const [grabLoading, setGrabLoading] = useState<Record<string, boolean>>({});
   const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
+  const [runLogs, setRunLogs] = useState<RunLog[]>([]);
 
   useEffect(() => {
     fetch("/api/contacts").then((r) => r.json()).then((data) => {
@@ -74,6 +80,9 @@ export default function Dashboard() {
     });
     fetch("/api/logs?mode=alerts").then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setActiveAlerts(data);
+    }).catch(() => { /* silent */ });
+    fetch("/api/runs").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setRunLogs(data);
     }).catch(() => { /* silent */ });
   }, []);
 
@@ -104,9 +113,7 @@ export default function Dashboard() {
     setShowConfirm(false);
     setRunningCron(true);
     setCronLogs([]);
-    const res = await fetch("/api/cron/drip?firstOnly=true", {
-      headers: { Authorization: "Bearer flip123secret" },
-    });
+    const res = await fetch("/api/run-drip?firstOnly=true");
     const data = await res.json();
     setCronLogs(data.logs ?? []);
     setRunningCron(false);
@@ -128,7 +135,9 @@ export default function Dashboard() {
 
   // Road to First Deal stats
   const DAILY_MSG_GOAL = 10;
-  const messagesSentToday = contacts.filter((c) => c.lastContact?.startsWith(today)).length;
+  const messagesSentToday = runLogs.filter(
+    (log) => log.status === "success" && log.date.startsWith(today)
+  ).length;
   const msgGoalDone = messagesSentToday >= DAILY_MSG_GOAL;
   const msgProgress = Math.min((messagesSentToday / DAILY_MSG_GOAL) * 100, 100);
 
