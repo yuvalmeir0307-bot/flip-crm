@@ -2,6 +2,10 @@ const API_KEY = process.env.OPENPHONE_API_KEY!;
 const YUVAL = process.env.YUVAL_PHONE_NUMBER!;
 const YAHAV = process.env.YAHAV_PHONE_NUMBER!;
 
+// Personal numbers for partner alerts (separate from the sender pool)
+const YUVAL_PERSONAL = process.env.YUVAL_PERSONAL_PHONE ?? YUVAL;
+const YAHAV_PERSONAL = process.env.YAHAV_PERSONAL_PHONE ?? YAHAV;
+
 // Alternates: index 0,2,4... = Yuval | index 1,3,5... = Yahav
 export function getSender(index: number): string {
   return index % 2 === 0 ? YUVAL : YAHAV;
@@ -16,6 +20,15 @@ export function getSenderByName(name: string): string {
   if (name.toLowerCase().includes("yuval")) return YUVAL;
   if (name.toLowerCase().includes("yahav")) return YAHAV;
   return YUVAL;
+}
+
+export async function alertBothPartners(message: string): Promise<void> {
+  // Send from Yuval's line to both personal numbers
+  const sender = YUVAL;
+  const targets = [YUVAL_PERSONAL, YAHAV_PERSONAL].filter(Boolean);
+  for (const to of targets) {
+    await sendSMS(to, message, sender);
+  }
 }
 
 export async function sendSMS(to: string, body: string, from: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {

@@ -8,11 +8,26 @@ type RunLog = {
   message: string; error: string;
 };
 
+type LogEntry = {
+  id: string; title: string; type: string; phone: string;
+  details: string; resolved: boolean; createdAt: string;
+};
+
 type Contact = {
   id: string; name: string; phone: string; status: string;
   dripStep: number; poolStep: number; date: string | null;
   lastContact: string | null; lastReply: string; brokerage: string; area: string;
   offerDate: string | null; closeDate: string | null;
+};
+
+const ALERT_TYPE_COLORS: Record<string, string> = {
+  DUPLICATE: "#facc15",
+  BROKEN_NAME: "#f97316",
+  FAILED_SMS: "#ef4444",
+  STOP: "#a855f7",
+  DAILY_REPORT: "#22c55e",
+  SMS_SENT: "#00e5ff",
+  INFO: "#6b7280",
 };
 
 // ── Flow Node ────────────────────────────────────────────────────────────────
@@ -67,6 +82,9 @@ export default function SettingsPage() {
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsSetupNeeded, setRunsSetupNeeded] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "success" | "failed">("all");
+  const [alerts, setAlerts] = useState<LogEntry[]>([]);
+  const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Contacts state (for flow modals)
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -81,7 +99,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (tab === "runs") loadRuns();
+    if (tab === "runs") { loadRuns(); loadLogs(); }
     if (tab === "flow" && !contactsLoaded) loadContacts();
   }, [tab]);
 
@@ -106,6 +124,29 @@ export default function SettingsPage() {
       else { setRuns(Array.isArray(data) ? data : []); }
     } catch { setRunsSetupNeeded(true); }
     setRunsLoading(false);
+  }
+
+  async function loadLogs() {
+    setLogsLoading(true);
+    try {
+      const [alertsRes, logsRes] = await Promise.all([
+        fetch("/api/logs?mode=alerts"),
+        fetch("/api/logs"),
+      ]);
+      const alertsData = await alertsRes.json();
+      const logsData = await logsRes.json();
+      if (Array.isArray(alertsData)) setAlerts(alertsData);
+      if (Array.isArray(logsData)) setAllLogs(logsData);
+    } catch { /* silent */ }
+    setLogsLoading(false);
+  }
+
+  async function resolveAlert(id: string) {
+    try {
+      await fetch("/api/logs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      setAllLogs((prev) => prev.map((l) => l.id === id ? { ...l, resolved: true } : l));
+    } catch { /* silent */ }
   }
 
   const filteredRuns = filterStatus === "all" ? runs : runs.filter((r) => r.status === filterStatus);
@@ -292,6 +333,119 @@ export default function SettingsPage() {
                 </table>
               </div>
             )}
+
+            {/* ── Recent Alerts ── */}
+            <div id="alerts" style={{ marginTop: 32 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#e5e5e5" }}>Recent Alerts</h3>
+                {alerts.length > 0 && (
+                  <span style={{
+                    background: "#ef444422", color: "#ef4444", fontSize: 11,
+                    fontWeight: 700, padding: "2px 10px", borderRadius: 99,
+                  }}>{alerts.length} open</span>
+                )}
+              </div>
+              {logsLoading ? (
+                <p style={{ color: "#6b7280", fontSize: 13 }}>Loading alerts...</p>
+              ) : alerts.length === 0 ? (
+                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+                  <span style={{ color: "#6b7280", fontSize: 13 }}>No open alerts — system healthy</span>
+                </div>
+              ) : (
+                <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {["Type", "Title", "Phone", "Details", "Time", ""].map((h) => (
+                          <th key={h} style={{ padding: "12px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {alerts.map((a, i) => (
+                        <tr key={a.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
+                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            <span style={{
+                              background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22",
+                              color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280",
+                              fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700,
+                            }}>{a.type}</span>
+                          </td>
+                          <td style={{ padding: "10px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{a.title}</td>
+                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{a.phone || "--"}</td>
+                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.details || "--"}</td>
+                          <td style={{ padding: "10px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>
+                            {a.createdAt ? new Date(a.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
+                          </td>
+                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            <button
+                              onClick={() => resolveAlert(a.id)}
+                              style={{
+                                background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44",
+                                borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                              }}
+                            >
+                              Resolve
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* ── Full Activity Log ── */}
+            <div style={{ marginTop: 32 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#e5e5e5", marginBottom: 14 }}>Activity Log</h3>
+              {logsLoading ? (
+                <p style={{ color: "#6b7280", fontSize: 13 }}>Loading log...</p>
+              ) : allLogs.length === 0 ? (
+                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px" }}>
+                  <p style={{ color: "#6b7280", fontSize: 13 }}>No log entries yet.</p>
+                </div>
+              ) : (
+                <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {["Type", "Title", "Phone", "Details", "Time", "Resolved"].map((h) => (
+                          <th key={h} style={{ padding: "12px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allLogs.map((l, i) => (
+                        <tr key={l.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616", opacity: l.resolved ? 0.5 : 1 }}>
+                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            <span style={{
+                              background: (ALERT_TYPE_COLORS[l.type] ?? "#6b7280") + "22",
+                              color: ALERT_TYPE_COLORS[l.type] ?? "#6b7280",
+                              fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700,
+                            }}>{l.type}</span>
+                          </td>
+                          <td style={{ padding: "10px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{l.title}</td>
+                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{l.phone || "--"}</td>
+                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.details || "--"}</td>
+                          <td style={{ padding: "10px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>
+                            {l.createdAt ? new Date(l.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
+                          </td>
+                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            {l.resolved ? (
+                              <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 600 }}>Resolved</span>
+                            ) : (
+                              <span style={{ color: "#6b7280", fontSize: 11 }}>Open</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </>
         )}
 

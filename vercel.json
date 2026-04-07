@@ -1,8 +1,7 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/drip",
-      "schedule": "30 15 * * 0,1,2,3,4"
-    }
+    { "path": "/api/cron/check-duplicates", "schedule": "30 4 * * 0,1,2,3,4" },
+    { "path": "/api/cron/daily-report", "schedule": "0 5 * * 0,1,2,3,4" },
+    { "path": "/api/cron/drip", "schedule": "30 7 * * 0,1,2,3,4" }
   ]
 }

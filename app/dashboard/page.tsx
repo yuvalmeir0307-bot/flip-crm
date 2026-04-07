@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 
 type Contact = {
   id: string; name: string; phone: string; status: string;
   dripStep: number; poolStep: number; date: string | null;
   lastContact: string | null; lastReply: string; brokerage: string; area: string;
+};
+
+type AlertEntry = {
+  id: string; title: string; type: string; phone: string; details: string; resolved: boolean; createdAt: string;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -60,12 +65,16 @@ export default function Dashboard() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [grabLoading, setGrabLoading] = useState<Record<string, boolean>>({});
   const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
+  const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
 
   useEffect(() => {
     fetch("/api/contacts").then((r) => r.json()).then((data) => {
       setContacts(data);
       setLoading(false);
     });
+    fetch("/api/logs?mode=alerts").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setActiveAlerts(data);
+    }).catch(() => { /* silent */ });
   }, []);
 
   async function grabAgents(person: "Yahav" | "Yuval") {
@@ -218,6 +227,37 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* ── Alert Banner ── */}
+        {activeAlerts.length > 0 ? (
+          <div style={{
+            background: "#ef444418", border: "1px solid #ef444433", borderRadius: 10,
+            padding: "10px 18px", marginBottom: 20,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 8px #ef444488" }} />
+              <span style={{ color: "#ef4444", fontSize: 13, fontWeight: 600 }}>
+                {activeAlerts.length} open alert{activeAlerts.length !== 1 ? "s" : ""} — needs attention
+              </span>
+            </div>
+            <Link href="/settings#alerts" style={{
+              color: "#ef4444", fontSize: 12, fontWeight: 600, textDecoration: "none",
+              background: "#ef444422", padding: "4px 14px", borderRadius: 6, border: "1px solid #ef444433",
+            }}>
+              View Alerts
+            </Link>
+          </div>
+        ) : (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            marginBottom: 20, padding: "8px 16px",
+            background: "#22c55e10", border: "1px solid #22c55e22", borderRadius: 10,
+          }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} />
+            <span style={{ color: "#22c55e", fontSize: 12, fontWeight: 500 }}>System healthy — no open alerts</span>
+          </div>
+        )}
 
         {/* ── Confirmation Modal ── */}
         {showConfirm && (

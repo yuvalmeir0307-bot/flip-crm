@@ -1,38 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
+import { classifyReply } from "@/lib/gemini";
 import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED } from "@/lib/drip";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
+import { createLog } from "@/lib/logs";
 
-type ClassifyResult = "HOT" | "NO_DEAL" | "NEUTRAL";
-
-/** Keyword-based reply classifier — no API calls, no rate limits */
-function classifyReply(message: string): ClassifyResult {
-  const lower = message.toLowerCase().trim();
-
-  const noDeals = [
-    "stop", "remove", "unsubscribe", "not interested", "dont contact",
-    "don't contact", "do not contact", "leave me alone", "no thank you",
-    "no thanks", "take me off", "opt out", "cease", "desist", "lawsuit",
-    "report", "spam", "wrong number", "wrong person",
-  ];
-
-  const hots = [
-    "interested", "yes", "call me", "sounds good", "tell me more",
-    "what's the address", "whats the address", "send me", "want to know",
-    "let's talk", "lets talk", "i have a", "i've got", "i got a",
-    "can we", "would love", "great idea", "absolutely", "definitely",
-    "for sure", "of course", "sure thing", "ok let's", "ok lets",
-    "i do", "what deal", "what property", "more info", "reach out",
-  ];
-
-  if (noDeals.some((kw) => lower.includes(kw))) return "NO_DEAL";
-  if (hots.some((kw) => lower.includes(kw))) return "HOT";
-  return "NEUTRAL";
-}
+const STOP_KEYWORDS = ["stop", "unsubscribe", "remove me", "opt out", "optout"];
 
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+    console.log("[webhook] received:", JSON.stringify(data).slice(0, 300));
     const type: string = data?.type;
 
     let phone: string | null = null;
@@ -49,7 +27,8 @@ export async function POST(req: NextRequest) {
       eventType = "Phone Call";
     }
 
-    if (!phone) return NextResponse.json({ ok: true });
+    console.log("[webhook] type:", type, "phone:", phone, "content:", content?.slice(0, 50));
+    if (!phone) return NextResponse.json({ ok: true, reason: "no_phone" });
 
     const page = await findContactByPhone(phone);
     if (!page) return NextResponse.json({ ok: true });
@@ -63,26 +42,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (contact.status !== "Drip Active" && contact.status !== "The Pool") {
-      return NextResponse.json({ ok: true });
-    }
-
-    let newStatus = STATUS_HOT;
-
-    if (eventType === "SMS") {
-      const classification = await classifyReply(content);
-      if (classification === "NO_DEAL") newStatus = STATUS_NO_DEAL;
-      else if (classification === "HOT") newStatus = STATUS_HOT;
-      else newStatus = STATUS_REPLIED; // NEUTRAL - mark as Replied for manual review
-    }
-
-    await updateContact(contact.id, {
-      Status: { select: { name: newStatus } },
+    // Always save the reply + update last contact date
+    const updateProps: Record<string, unknown> = {
       "Last Reply": { rich_text: [{ text: { content: `[${eventType}] ${content}` } }] },
       "Last Contact": { date: { start: new Date().toISOString() } },
-    });
+    };
 
-    return NextResponse.json({ ok: true });
+    // Only classify & change status for Drip Active / The Pool contacts
+    if (contact.status === "Drip Active" || contact.status === "The Pool") {
+      if (eventType === "SMS") {
+        try {
+          const classification = await classifyReply(content);
+          if (classification === "NO_DEAL") {
+            updateProps.Status = { select: { name: STATUS_NO_DEAL } };
+          } else if (classification === "HOT") {
+            updateProps.Status = { select: { name: STATUS_HOT } };
+          } else {
+            updateProps.Status = { select: { name: STATUS_REPLIED } };
+          }
+        } catch {
+          // If Gemini fails, still save the reply
+        }
+      } else {
+        // Phone call — mark as HOT
+        updateProps.Status = { select: { name: STATUS_HOT } };
+      }
+    }
+
+    await updateContact(contact.id, updateProps);
+    console.log("[webhook] saved reply for:", contact.name, contact.phone);
+
+    // Detect STOP / unsubscribe requests
+    if (eventType === "SMS") {
+      const lowerContent = content.toLowerCase().trim();
+      const isStop = STOP_KEYWORDS.some((kw) => lowerContent.includes(kw));
+      if (isStop) {
+        await createLog(
+          `STOP received from ${contact.name}`,
+          "STOP",
+          contact.phone,
+          `Message: "${content}"`
+        );
+      }
+    }
+
+    return NextResponse.json({ ok: true, saved: true });
   } catch (err) {
     console.error("[webhook] error:", err);
     return NextResponse.json({ ok: true });
