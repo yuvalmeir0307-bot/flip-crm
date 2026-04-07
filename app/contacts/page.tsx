@@ -180,39 +180,43 @@ function ContactDetailModal({ contact, onClose, onStatusChange }: {
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 16, borderTop: "1px solid #222" }}>
-          {/* Call with verification step */}
-          {callState === "idle" && (
-            <button
-              onClick={() => setCallState("confirm")}
-              style={{
-                background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944",
-                borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                display: "inline-flex", alignItems: "center", gap: 6,
-              }}
-            >
-              📞 Call
-            </button>
+          {/* Call — only for contacts who replied or are in Pool (never cold call) */}
+          {["Replied - Pivot Call Needed - HOT", "Replied", "The Pool", "Potential Deal", "Offer Submitted", "Underwriting"].includes(contact.status) && (
+            <>
+              {callState === "idle" && (
+                <button
+                  onClick={() => setCallState("confirm")}
+                  style={{
+                    background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944",
+                    borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  📞 Call
+                </button>
+              )}
+              {callState === "confirm" && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#fb923c", fontWeight: 600 }}>Call {contact.name.split(" ")[0]}?</span>
+                  <button
+                    onClick={initiateCall}
+                    style={{ background: "#f97316", color: "#000", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setCallState("idle")}
+                    style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {callState === "calling" && <span style={{ fontSize: 13, color: "#f97316", alignSelf: "center" }}>📞 Calling...</span>}
+              {callState === "done" && <span style={{ fontSize: 13, color: "#10b981", alignSelf: "center" }}>✓ Call initiated</span>}
+              {callState === "error" && <span style={{ fontSize: 13, color: "#ef4444", alignSelf: "center" }} title={callError}>✗ Call failed</span>}
+            </>
           )}
-          {callState === "confirm" && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: "#fb923c", fontWeight: 600 }}>Call {contact.name.split(" ")[0]}?</span>
-              <button
-                onClick={initiateCall}
-                style={{ background: "#f97316", color: "#000", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => setCallState("idle")}
-                style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </span>
-          )}
-          {callState === "calling" && <span style={{ fontSize: 13, color: "#f97316", alignSelf: "center" }}>📞 Calling...</span>}
-          {callState === "done" && <span style={{ fontSize: 13, color: "#10b981", alignSelf: "center" }}>✓ Call initiated</span>}
-          {callState === "error" && <span style={{ fontSize: 13, color: "#ef4444", alignSelf: "center" }} title={callError}>✗ Call failed</span>}
 
           {/* Message with verification step */}
           {msgState === "idle" && (

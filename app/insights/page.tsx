@@ -216,9 +216,9 @@ export default function Insights() {
       c.status === "Potential Deal"
   ).length;
 
-  // Converted to pool = in The Pool or has pool steps
+  // Call rate = contacts who had an actual call (now in Pool or beyond)
   const convertedToPool = filtered.filter(
-    (c) => c.status === "The Pool" || c.poolStep > 0
+    (c) => ["The Pool", "Potential Deal", "Offer Submitted", "Underwriting"].includes(c.status)
   ).length;
 
   // Contacted = at least 1 message sent
@@ -320,9 +320,9 @@ export default function Insights() {
             color="#ec4899"
           />
           <StatCard
-            label="Converted to Pool"
+            label="Had a Call"
             value={convertedToPool}
-            sub="Moved into pool campaign"
+            sub="Agents who had a conversation"
             color="#a855f7"
           />
         </div>
@@ -342,7 +342,7 @@ export default function Insights() {
             denominator={contacted}
           />
           <RateCard
-            label="Pool Conversion Rate"
+            label="Call Rate"
             color="#a855f7"
             numerator={convertedToPool}
             denominator={contacted}
