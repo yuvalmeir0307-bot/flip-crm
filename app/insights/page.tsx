@@ -8,7 +8,53 @@ type Contact = {
   dripStep: number;
   poolStep: number;
   lastReply: string;
+  lastContact: string | null;
 };
+
+type Period = "day" | "week" | "month" | "year" | "all";
+
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "day", label: "Daily" },
+  { key: "week", label: "Weekly" },
+  { key: "month", label: "Monthly" },
+  { key: "year", label: "Yearly" },
+  { key: "all", label: "All Time" },
+];
+
+function getPeriodStart(period: Period): Date | null {
+  const now = new Date();
+  if (period === "day") {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (period === "week") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 6);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  if (period === "month") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 29);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  if (period === "year") {
+    const d = new Date(now);
+    d.setFullYear(d.getFullYear() - 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  return null;
+}
+
+function filterByPeriod(contacts: Contact[], period: Period): Contact[] {
+  const start = getPeriodStart(period);
+  if (!start) return contacts;
+  return contacts.filter((c) => {
+    if (!c.lastContact) return false;
+    return new Date(c.lastContact) >= start;
+  });
+}
 
 function StatCard({
   label,
@@ -134,6 +180,7 @@ function RateCard({
 export default function Insights() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>("all");
 
   useEffect(() => {
     fetch("/api/contacts")
@@ -144,8 +191,10 @@ export default function Insights() {
       });
   }, []);
 
+  const filtered = filterByPeriod(contacts, period);
+
   // Messages sent = total drip + pool steps sent across all contacts
-  const messagesSent = contacts.reduce((sum, c) => sum + c.dripStep + c.poolStep, 0);
+  const messagesSent = filtered.reduce((sum, c) => sum + c.dripStep + c.poolStep, 0);
 
   // Replied = contacts with a lastReply value OR status indicates a reply
   const repliedStatuses = [
@@ -154,26 +203,26 @@ export default function Insights() {
     "No Deal - Auto Reply",
     "Underwriting",
   ];
-  const replied = contacts.filter(
+  const replied = filtered.filter(
     (c) =>
       (c.lastReply && c.lastReply.trim() !== "") ||
       repliedStatuses.includes(c.status)
   ).length;
 
   // Engaged calls = HOT leads + discovery call needed
-  const engagedCalls = contacts.filter(
+  const engagedCalls = filtered.filter(
     (c) =>
       c.status === "Replied - Pivot Call Needed - HOT" ||
       c.status === "Potential Deal"
   ).length;
 
   // Converted to pool = in The Pool or has pool steps
-  const convertedToPool = contacts.filter(
+  const convertedToPool = filtered.filter(
     (c) => c.status === "The Pool" || c.poolStep > 0
   ).length;
 
   // Contacted = at least 1 message sent
-  const contacted = contacts.filter((c) => c.dripStep > 0 || c.poolStep > 0).length;
+  const contacted = filtered.filter((c) => c.dripStep > 0 || c.poolStep > 0).length;
 
   if (loading) {
     return (
@@ -192,13 +241,55 @@ export default function Insights() {
 
       <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
         {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", margin: 0 }}>
-            Insights
-          </h1>
-          <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 4 }}>
-            Campaign performance overview
-          </p>
+        <div
+          style={{
+            marginBottom: 32,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", margin: 0 }}>
+              Insights
+            </h1>
+            <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 4 }}>
+              Campaign performance overview
+            </p>
+          </div>
+
+          {/* Period toggle */}
+          <div
+            style={{
+              display: "flex",
+              background: "#f3f4f6",
+              borderRadius: 10,
+              padding: 4,
+              gap: 2,
+            }}
+          >
+            {PERIODS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 7,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  transition: "all 0.15s ease",
+                  background: period === key ? "#111827" : "transparent",
+                  color: period === key ? "#ffffff" : "#6b7280",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 4 count cards */}
