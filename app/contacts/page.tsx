@@ -263,9 +263,6 @@ export default function ContactsPage() {
   const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active", assignedTo: "" });
   const [saving, setSaving] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [grabLoading, setGrabLoading] = useState<Record<string, boolean>>({});
-  const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
-
   useEffect(() => { loadContacts(); }, []);
 
   async function loadContacts() {
@@ -287,25 +284,6 @@ export default function ContactsPage() {
     setShowAdd(false);
     setSaving(false);
     await loadContacts();
-  }
-
-  async function grabAgents(person: "Yahav" | "Yuval") {
-    setGrabLoading((prev) => ({ ...prev, [person]: true }));
-    setGrabResult(null);
-    try {
-      const res = await fetch("/api/grab-agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedTo: person, count: 5 }),
-      });
-      const data = await res.json();
-      setGrabResult({ person, added: data.added ?? [], skipped: data.skipped ?? [], errors: data.errors ?? [] });
-      if ((data.added ?? []).length > 0) await loadContacts();
-    } catch {
-      setGrabResult({ person, added: [], skipped: [], errors: ["Network error"] });
-    } finally {
-      setGrabLoading((prev) => ({ ...prev, [person]: false }));
-    }
   }
 
   async function updateStatus(id: string, status: string) {
@@ -344,23 +322,6 @@ export default function ContactsPage() {
             <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>{filtered.length} agents</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {(["Yahav", "Yuval"] as const).map((person) => (
-              <button
-                key={person}
-                onClick={() => grabAgents(person)}
-                disabled={!!grabLoading[person]}
-                style={{
-                  background: grabLoading[person] ? "#1a1a1a" : "#7c3aed22",
-                  color: grabLoading[person] ? "#555" : "#a78bfa",
-                  border: "1px solid #7c3aed44",
-                  borderRadius: 10, padding: "11px 18px", fontWeight: 700,
-                  fontSize: 13, cursor: grabLoading[person] ? "not-allowed" : "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                {grabLoading[person] ? `Grabbing ${person}...` : `Grab Agents → ${person}`}
-              </button>
-            ))}
             <button
               onClick={() => setShowAdd(!showAdd)}
               style={{
@@ -373,41 +334,6 @@ export default function ContactsPage() {
             </button>
           </div>
         </div>
-
-        {/* Grab Agents Result Banner */}
-        {grabResult && (
-          <div style={{
-            background: grabResult.errors.length && !grabResult.added.length ? "#ef444422" : "#10b98122",
-            border: `1px solid ${grabResult.errors.length && !grabResult.added.length ? "#ef4444" : "#10b981"}55`,
-            borderRadius: 10, padding: "14px 18px", marginBottom: 20,
-            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-          }}>
-            <div>
-              <div style={{ fontWeight: 700, color: "#fff", fontSize: 14, marginBottom: 4 }}>
-                Grab Agents — {grabResult.person}
-              </div>
-              {grabResult.added.length > 0 && (
-                <div style={{ color: "#34d399", fontSize: 13 }}>
-                  Added {grabResult.added.length}: {grabResult.added.join(", ")}
-                </div>
-              )}
-              {grabResult.skipped.length > 0 && (
-                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
-                  Skipped (already in CRM): {grabResult.skipped.length}
-                </div>
-              )}
-              {grabResult.errors.length > 0 && (
-                <div style={{ color: "#f87171", fontSize: 12, marginTop: 2 }}>
-                  Errors: {grabResult.errors.join("; ")}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setGrabResult(null)}
-              style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}
-            >✕</button>
-          </div>
-        )}
 
         {/* Add Contact Modal */}
         {showAdd && (

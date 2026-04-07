@@ -58,6 +58,8 @@ export default function Dashboard() {
   const [runningCron, setRunningCron] = useState(false);
   const [cronLogs, setCronLogs] = useState<string[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [grabLoading, setGrabLoading] = useState<Record<string, boolean>>({});
+  const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
 
   useEffect(() => {
     fetch("/api/contacts").then((r) => r.json()).then((data) => {
@@ -65,6 +67,27 @@ export default function Dashboard() {
       setLoading(false);
     });
   }, []);
+
+  async function grabAgents(person: "Yahav" | "Yuval") {
+    setGrabLoading((prev) => ({ ...prev, [person]: true }));
+    setGrabResult(null);
+    try {
+      const res = await fetch("/api/grab-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedTo: person, count: 5 }),
+      });
+      const data = await res.json();
+      setGrabResult({ person, added: data.added ?? [], skipped: data.skipped ?? [], errors: data.errors ?? [] });
+      if ((data.added ?? []).length > 0) {
+        fetch("/api/contacts").then((r) => r.json()).then(setContacts);
+      }
+    } catch {
+      setGrabResult({ person, added: [], skipped: [], errors: ["Network error"] });
+    } finally {
+      setGrabLoading((prev) => ({ ...prev, [person]: false }));
+    }
+  }
 
   const step0Count = contacts.filter((c) => c.status === "Drip Active" && (c.dripStep || 0) === 0).length;
 
@@ -160,21 +183,40 @@ export default function Dashboard() {
             <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827" }}>Dashboard</h1>
             <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 2 }}>Welcome back, Yuval and Yahav</p>
           </div>
-          <button
-            onClick={() => setShowConfirm(true)}
-            disabled={runningCron}
-            style={{
-              background: "#1a1a1a", color: "#fff", border: "none",
-              borderRadius: 10, padding: "11px 22px", fontWeight: 600,
-              fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-              opacity: runningCron ? 0.7 : 1,
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <polygon points="2,1 11,6 2,11" fill="#fff" />
-            </svg>
-            {runningCron ? "Running..." : "Run Drip Now"}
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {(["Yahav", "Yuval"] as const).map((person) => (
+              <button
+                key={person}
+                onClick={() => grabAgents(person)}
+                disabled={!!grabLoading[person]}
+                style={{
+                  background: grabLoading[person] ? "#1a1a1a" : "#7c3aed22",
+                  color: grabLoading[person] ? "#555" : "#a78bfa",
+                  border: "1px solid #7c3aed44",
+                  borderRadius: 10, padding: "11px 18px", fontWeight: 700,
+                  fontSize: 13, cursor: grabLoading[person] ? "not-allowed" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                {grabLoading[person] ? `Grabbing ${person}...` : `Grab Agents → ${person}`}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowConfirm(true)}
+              disabled={runningCron}
+              style={{
+                background: "#1a1a1a", color: "#fff", border: "none",
+                borderRadius: 10, padding: "11px 22px", fontWeight: 600,
+                fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                opacity: runningCron ? 0.7 : 1,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <polygon points="2,1 11,6 2,11" fill="#fff" />
+              </svg>
+              {runningCron ? "Running..." : "Run Drip Now"}
+            </button>
+          </div>
         </div>
 
         {/* ── Confirmation Modal ── */}
@@ -215,6 +257,32 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Grab Agents Result Banner */}
+        {grabResult && (
+          <div style={{
+            background: grabResult.errors.length && !grabResult.added.length ? "#ef444422" : "#10b98122",
+            border: `1px solid ${grabResult.errors.length && !grabResult.added.length ? "#ef4444" : "#10b981"}55`,
+            borderRadius: 10, padding: "14px 18px", marginBottom: 20,
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "#fff", fontSize: 14, marginBottom: 4 }}>
+                Grab Agents — {grabResult.person}
+              </div>
+              {grabResult.added.length > 0 && (
+                <div style={{ color: "#34d399", fontSize: 13 }}>Added {grabResult.added.length}: {grabResult.added.join(", ")}</div>
+              )}
+              {grabResult.skipped.length > 0 && (
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>Skipped (already in CRM): {grabResult.skipped.length}</div>
+              )}
+              {grabResult.errors.length > 0 && (
+                <div style={{ color: "#f87171", fontSize: 12, marginTop: 2 }}>Errors: {grabResult.errors.join("; ")}</div>
+              )}
+            </div>
+            <button onClick={() => setGrabResult(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
           </div>
         )}
 
