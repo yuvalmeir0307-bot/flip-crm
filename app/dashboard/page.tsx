@@ -94,6 +94,21 @@ export default function Dashboard() {
     (c) => (c.status === "Drip Active" || c.status === "The Pool") && (!c.date || c.date <= today)
   );
 
+  // Road to First Deal stats
+  const DAILY_MSG_GOAL = 10;
+  const messagesSentToday = contacts.filter((c) => c.lastContact?.startsWith(today)).length;
+  const msgGoalDone = messagesSentToday >= DAILY_MSG_GOAL;
+  const msgProgress = Math.min((messagesSentToday / DAILY_MSG_GOAL) * 100, 100);
+
+  const repliedToUs = contacts.filter(
+    (c) => c.status === "Replied" || c.status === "Replied - Pivot Call Needed - HOT"
+  ).length;
+  const reachedBackToday = contacts.filter(
+    (c) =>
+      (c.status === "Replied" || c.status === "Replied - Pivot Call Needed - HOT") &&
+      c.lastContact?.startsWith(today)
+  ).length;
+
   // Build 7-day rolling series from real contact dates
   function buildSeries(days: number, filterFn?: (c: Contact) => boolean) {
     const today = new Date();
@@ -202,6 +217,189 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* ── Road to the First Deal ── */}
+        <div style={{
+          background: "linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 50%, #0f0f0f 100%)",
+          border: "1px solid #2a2a3e",
+          borderRadius: 20,
+          padding: "32px 36px",
+          marginBottom: 24,
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          {/* Glow effect */}
+          <div style={{
+            position: "absolute", top: -60, right: -60, width: 220, height: 220,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+          <div style={{
+            position: "absolute", bottom: -40, left: 100, width: 160, height: 160,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+
+          {/* Title */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 6 }}>
+              OUR MISSION
+            </div>
+            <h2 style={{
+              fontSize: 32, fontWeight: 900, lineHeight: 1.1, margin: 0,
+              background: "linear-gradient(90deg, #ffffff 0%, #a5b4fc 50%, #00e5ff 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>
+              ROAD TO THE FIRST DEAL
+            </h2>
+            <p style={{ fontSize: 13, color: "#4b5563", marginTop: 6, fontStyle: "italic" }}>
+              Every message is a step closer. Stay consistent. Stay hungry.
+            </p>
+          </div>
+
+          {/* Goals Row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+            {/* Daily Goal: Send 10 Messages */}
+            <div style={{
+              background: msgGoalDone ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${msgGoalDone ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: 14,
+              padding: "22px 24px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+                    Daily Goal
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb" }}>
+                    Send 10 Messages
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 99,
+                  background: msgGoalDone ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                  color: msgGoalDone ? "#22c55e" : "#ef4444",
+                  letterSpacing: "0.05em",
+                }}>
+                  {msgGoalDone ? "DONE" : "IN PROGRESS"}
+                </div>
+              </div>
+
+              {/* Big number */}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 14 }}>
+                <span style={{
+                  fontSize: 56, fontWeight: 900, lineHeight: 1,
+                  color: msgGoalDone ? "#22c55e" : "#ffffff",
+                }}>
+                  {messagesSentToday}
+                </span>
+                <span style={{ fontSize: 20, color: "#4b5563", fontWeight: 600 }}>
+                  / {DAILY_MSG_GOAL}
+                </span>
+                <span style={{ fontSize: 13, color: "#6b7280", marginLeft: 4 }}>sent today</span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 6, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", borderRadius: 99,
+                  width: `${msgProgress}%`,
+                  background: msgGoalDone
+                    ? "linear-gradient(90deg, #22c55e, #4ade80)"
+                    : "linear-gradient(90deg, #6366f1, #00e5ff)",
+                  transition: "width 0.6s ease",
+                }} />
+              </div>
+              {!msgGoalDone && (
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
+                  {DAILY_MSG_GOAL - messagesSentToday} more to hit the goal
+                </div>
+              )}
+              {msgGoalDone && (
+                <div style={{ fontSize: 11, color: "#22c55e", marginTop: 8, fontWeight: 600 }}>
+                  Goal crushed! Keep the momentum going.
+                </div>
+              )}
+            </div>
+
+            {/* Reply Back Goal */}
+            <div style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 14,
+              padding: "22px 24px",
+            }}>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+                  Reply Pipeline
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb" }}>
+                  Respond to Every Reply
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {/* Replied to us */}
+                <div style={{
+                  background: "rgba(251,191,36,0.06)",
+                  border: "1px solid rgba(251,191,36,0.2)",
+                  borderRadius: 10, padding: "14px 16px",
+                }}>
+                  <div style={{ fontSize: 10, color: "#92400e", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                    Replied to Us
+                  </div>
+                  <div style={{ fontSize: 42, fontWeight: 900, color: "#fbbf24", lineHeight: 1 }}>
+                    {repliedToUs}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    waiting in inbox
+                  </div>
+                </div>
+
+                {/* We reached back */}
+                <div style={{
+                  background: reachedBackToday > 0 ? "rgba(99,102,241,0.06)" : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${reachedBackToday > 0 ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.06)"}`,
+                  borderRadius: 10, padding: "14px 16px",
+                }}>
+                  <div style={{ fontSize: 10, color: "#4338ca", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                    We Reached Back
+                  </div>
+                  <div style={{ fontSize: 42, fontWeight: 900, color: reachedBackToday > 0 ? "#818cf8" : "#374151", lineHeight: 1 }}>
+                    {reachedBackToday}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    followed up today
+                  </div>
+                </div>
+              </div>
+
+              {repliedToUs > 0 && reachedBackToday < repliedToUs && (
+                <div style={{
+                  marginTop: 12, padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.15)",
+                  fontSize: 12, color: "#d97706", fontWeight: 600,
+                }}>
+                  {repliedToUs - reachedBackToday} replies still need your attention
+                </div>
+              )}
+              {repliedToUs > 0 && reachedBackToday >= repliedToUs && (
+                <div style={{
+                  marginTop: 12, padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)",
+                  fontSize: 12, color: "#22c55e", fontWeight: 600,
+                }}>
+                  All replies handled today. Locked in.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Stats Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
