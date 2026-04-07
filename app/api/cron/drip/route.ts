@@ -65,15 +65,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const firstName = contact.name.split(" ")[0] || "there";
+    const rawFirst = contact.name.split(" ")[0] || "";
+    // Sanitize: strip non-ASCII chars (e.g. ???? from encoding issues), fallback to "there"
+    const firstName = rawFirst.replace(/[^\x20-\x7E]/g, "").trim() || "there";
     // Prefer assignedTo so pool follow-ups always use the agent who originally talked to this contact
     // Case-insensitive check to handle variations (lowercase, trailing spaces, "Both", etc.)
     const assignedLower = (contact.assignedTo ?? "").toLowerCase().trim();
     const isYuval = assignedLower.includes("yuval");
     const isYahav = assignedLower.includes("yahav");
     const knownAgent = isYuval || isYahav;
-    const senderName = knownAgent ? (isYuval ? "Yuval" : "Yahav") : getSenderName(i);
-    const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(i);
+    // Deterministic fallback — same contact always gets same sender based on phone, not loop index
+    const phoneLastDigit = parseInt(contact.phone.replace(/\D/g, "").slice(-1), 10);
+    const senderName = knownAgent ? (isYuval ? "Yuval" : "Yahav") : (phoneLastDigit % 2 === 0 ? "Yuval" : "Yahav");
+    const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(phoneLastDigit % 2);
 
     // Try to get script from Notion, fallback to hardcoded
     let message: string;
