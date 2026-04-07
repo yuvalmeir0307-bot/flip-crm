@@ -1,34 +1,36 @@
 /**
  * Skill: grabAgents
  *
- * Finds real estate agents for the Milwaukee, WI area using Gemini + Google
- * Search grounding. Uses a dedicated API key (GEMINI_GRAB_KEY) separate from
- * the main Gemini key used for transcription/classification, so quotas don't
- * interfere with each other.
+ * Scrapes real estate agents from realtor.com using ScraperAPI (free tier:
+ * 5,000 req/month) to bypass Vercel IP blocking. Extracts direct/mobile
+ * phone numbers and adds new agents to the Flip CRM Notion database.
  */
 
 import { findContactByPhone, createContact } from "@/lib/notion";
 
-const GEMINI_API_KEY = process.env.GEMINI_GRAB_KEY ?? "AIzaSyCGbCWnLPQ9TZBMPxvweiUZL4sta1_YkeE";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY!;
 
+// Milwaukee + ~40-min drive radius
 const LOCATIONS = [
-  "Milwaukee, WI",
-  "Wauwatosa, WI",
-  "West Allis, WI",
-  "Brookfield, WI",
-  "Waukesha, WI",
-  "Menomonee Falls, WI",
-  "New Berlin, WI",
-  "Mequon, WI",
-  "Oak Creek, WI",
-  "Shorewood, WI",
-  "Greenfield, WI",
-  "Franklin, WI",
-  "Glendale, WI",
-  "Racine, WI",
-  "Grafton, WI",
+  "Milwaukee_WI",
+  "Wauwatosa_WI",
+  "West-Allis_WI",
+  "Brookfield_WI",
+  "Waukesha_WI",
+  "Menomonee-Falls_WI",
+  "New-Berlin_WI",
+  "Mequon_WI",
+  "Oak-Creek_WI",
+  "Shorewood_WI",
+  "Greenfield_WI",
+  "Franklin_WI",
+  "Glendale_WI",
+  "Racine_WI",
+  "Grafton_WI",
 ];
+
+// Phone type priority: lower index = higher priority
+const PHONE_PRIORITY = ["mobile", "direct", "office"];
 
 export interface GrabResult {
   added: string[];
@@ -36,14 +38,20 @@ export interface GrabResult {
   errors: string[];
 }
 
-interface GeminiAgent {
-  name: string;
-  phone: string;
-  email?: string;
-  brokerage?: string;
-  area?: string;
+interface RawPhone {
+  number: string;
+  type: string;
 }
 
+interface RawAgent {
+  full_name?: string;
+  phones?: RawPhone[];
+  email?: string;
+  broker?: { name?: string };
+  office?: { name?: string };
+}
+
+/** Normalize any US phone string to E.164 (+1XXXXXXXXXX) */
 function toE164(raw: string): string {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
@@ -53,59 +61,66 @@ function toE164(raw: string): string {
   return "";
 }
 
-async function findAgentsViaGemini(
-  city: string,
-  count: number
-): Promise<{ agents: GeminiAgent[]; error?: string }> {
-  const prompt = `Search for ${count} active real estate agents who work in ${city}.
+/** Sort phones by priority and return { primary, alts } */
+function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[] } {
+  const valid = phones
+    .filter((p) => p.number && p.type !== "fax")
+    .map((p) => ({ ...p, e164: toE164(p.number) }))
+    .filter((p) => p.e164.length === 12);
 
-For each agent find their: full name, direct mobile or personal phone number, email address, and brokerage name.
+  valid.sort((a, b) => {
+    const ai = PHONE_PRIORITY.indexOf(a.type) === -1 ? 99 : PHONE_PRIORITY.indexOf(a.type);
+    const bi = PHONE_PRIORITY.indexOf(b.type) === -1 ? 99 : PHONE_PRIORITY.indexOf(b.type);
+    return ai - bi;
+  });
 
-Return ONLY a valid JSON array, no markdown, no explanation:
-[
-  {"name": "Full Name", "phone": "+1XXXXXXXXXX", "email": "agent@example.com", "brokerage": "Brokerage Name", "area": "${city}"},
-  ...
-]
+  if (!valid.length) return { primary: "", alts: [] };
+  const primary = valid[0].e164;
+  const alts = Array.from(new Set(valid.slice(1).map((p) => p.e164).filter((n) => n !== primary)));
+  return { primary, alts };
+}
 
-Rules:
-- Phone must be a direct/mobile number for the agent (not a general brokerage office line)
-- Phone must be in E.164 format (+1XXXXXXXXXX)
-- Only include agents you can confirm exist with a verified phone
-- Do not fabricate — if fewer than ${count} found, return what you have`;
+/** Fetch one page of agents from realtor.com via ScraperAPI */
+async function fetchAgentsPage(locationSlug: string, page: number): Promise<{ agents: RawAgent[]; error?: string }> {
+  const targetUrl = page === 1
+    ? `https://www.realtor.com/realestateagents/${locationSlug}`
+    : `https://www.realtor.com/realestateagents/${locationSlug}/pg-${page}`;
+
+  const scraperUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=false`;
 
   try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
-      }),
+    const res = await fetch(scraperUrl, {
+      headers: { "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return { agents: [], error: `Gemini HTTP ${res.status}: ${errText.slice(0, 200)}` };
-    }
+    if (!res.ok) return { agents: [], error: `ScraperAPI HTTP ${res.status}` };
 
-    const data = await res.json();
-    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const html = await res.text();
 
-    if (!text) {
-      return { agents: [], error: `Gemini empty response` };
-    }
+    const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!match) return { agents: [], error: "No __NEXT_DATA__ found" };
 
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return { agents: [] };
+    const data = JSON.parse(match[1]);
+    const pageProps = data?.props?.pageProps ?? {};
 
-    const agents = JSON.parse(jsonMatch[0]) as GeminiAgent[];
-    return { agents: Array.isArray(agents) ? agents : [] };
+    const agents: RawAgent[] =
+      pageProps?.agentInfo?.matching_rows ??
+      pageProps?.agents ??
+      pageProps?.data?.agents ??
+      pageProps?.initialData?.agents ??
+      pageProps?.searchResults?.agents ??
+      [];
+
+    return { agents };
   } catch (e) {
-    return { agents: [], error: `Gemini exception: ${e instanceof Error ? e.message : String(e)}` };
+    return { agents: [], error: e instanceof Error ? e.message : String(e) };
   }
 }
 
+/**
+ * Main entry point.
+ * Pulls `count` new agents (not already in Notion) for the given assignee.
+ */
 export async function grabAndAddAgents(
   assignedTo: "Yahav" | "Yuval",
   count = 5
@@ -114,46 +129,59 @@ export async function grabAndAddAgents(
   const skipped: string[] = [];
   const errors: string[] = [];
 
+  if (!SCRAPER_API_KEY) {
+    errors.push("SCRAPER_API_KEY env var is not set");
+    return { added, skipped, errors };
+  }
+
+  // Shuffle locations for variety on each run
   const locations = [...LOCATIONS].sort(() => Math.random() - 0.5);
 
-  for (const city of locations) {
-    if (added.length >= count) break;
+  outer: for (const slug of locations) {
+    for (let page = 1; page <= 5; page++) {
+      if (added.length >= count) break outer;
 
-    const needed = count - added.length;
-    const { agents, error } = await findAgentsViaGemini(city, Math.min(needed + 3, 8));
+      const { agents: rawAgents, error } = await fetchAgentsPage(slug, page);
 
-    if (error) {
-      errors.push(`[${city}] ${error}`);
-      break;
-    }
+      if (error) {
+        errors.push(`[${slug} p${page}] ${error}`);
+        if (error.startsWith("ScraperAPI HTTP")) break; // stop this slug on HTTP errors
+        continue;
+      }
 
-    for (const agent of agents) {
-      if (added.length >= count) break;
-      if (!agent.name || !agent.phone) continue;
+      if (!rawAgents.length) break; // no more pages for this location
 
-      const phone = toE164(agent.phone);
-      if (!phone || phone.length !== 12) continue;
+      for (const raw of rawAgents) {
+        if (added.length >= count) break outer;
+        if (!raw.full_name || !raw.phones?.length) continue;
 
-      try {
-        const existing = await findContactByPhone(phone);
-        if (existing) { skipped.push(agent.name); continue; }
-      } catch { /* ignore lookup failures */ }
+        const { primary, alts } = pickBestPhone(raw.phones);
+        if (!primary) continue;
 
-      try {
-        await createContact({
-          name: agent.name,
-          phone,
-          email: agent.email ?? "",
-          brokerage: agent.brokerage ?? "",
-          area: agent.area ?? city,
-          source: "Realtor Search",
-          status: "Drip Active",
-          altPhones: "",
-          assignedTo,
-        });
-        added.push(agent.name);
-      } catch (e) {
-        errors.push(`${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`);
+        // Skip if already in Notion
+        try {
+          const existing = await findContactByPhone(primary);
+          if (existing) { skipped.push(raw.full_name); continue; }
+        } catch { /* ignore lookup failures */ }
+
+        const brokerage = raw.broker?.name ?? raw.office?.name ?? "";
+
+        try {
+          await createContact({
+            name: raw.full_name,
+            phone: primary,
+            email: raw.email ?? "",
+            brokerage,
+            area: slug.replace(/_/g, " "),
+            source: "Realtor.com",
+            status: "Drip Active",
+            altPhones: alts.join(", "),
+            assignedTo,
+          });
+          added.push(raw.full_name);
+        } catch (e) {
+          errors.push(`${raw.full_name}: ${e instanceof Error ? e.message : "Unknown error"}`);
+        }
       }
     }
   }
