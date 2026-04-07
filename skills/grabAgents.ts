@@ -58,7 +58,7 @@ function toE164(raw: string): string {
  * Use Gemini with Google Search grounding to find real estate agents
  * in a given city. Returns up to `count` agents with phone numbers.
  */
-async function findAgentsViaGemini(city: string, count: number): Promise<GeminiAgent[]> {
+async function findAgentsViaGemini(city: string, count: number): Promise<{ agents: GeminiAgent[]; debugError?: string }> {
   const prompt = `Search for ${count} active real estate agents who work in ${city}.
 
 For each agent find: their full name, phone number (mobile preferred), email address, and brokerage/agency name.
@@ -86,19 +86,28 @@ Rules:
       }),
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { agents: [], debugError: `Gemini HTTP ${res.status}: ${errText.slice(0, 200)}` };
+    }
 
     const data = await res.json();
     const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
+    if (!text) {
+      return { agents: [], debugError: `Gemini empty text. Raw: ${JSON.stringify(data).slice(0, 300)}` };
+    }
+
     // Extract JSON array from the response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    if (!jsonMatch) {
+      return { agents: [], debugError: `No JSON array in Gemini response: ${text.slice(0, 200)}` };
+    }
 
     const agents = JSON.parse(jsonMatch[0]) as GeminiAgent[];
-    return Array.isArray(agents) ? agents : [];
-  } catch {
-    return [];
+    return { agents: Array.isArray(agents) ? agents : [] };
+  } catch (e) {
+    return { agents: [], debugError: `Gemini exception: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
@@ -122,7 +131,12 @@ export async function grabAndAddAgents(
 
     const needed = count - added.length;
     // Ask for a few extra in case some are duplicates
-    const agents = await findAgentsViaGemini(city, Math.min(needed + 2, 8));
+    const { agents, debugError } = await findAgentsViaGemini(city, Math.min(needed + 2, 8));
+
+    if (debugError) {
+      errors.push(`[${city}] ${debugError}`);
+      break; // no point retrying other cities if Gemini itself is failing
+    }
 
     for (const agent of agents) {
       if (added.length >= count) break;
