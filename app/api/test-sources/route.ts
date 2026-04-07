@@ -67,15 +67,16 @@ function findAgentArrayPaths(obj: unknown, path: string, depth: number): string[
 
 export async function GET() {
   const results = await Promise.all([
-    tryFetch("homes.com Milwaukee agents", "https://www.homes.com/real-estate-agents/milwaukee-wi/"),
-    tryFetch("homes.com Milwaukee p2", "https://www.homes.com/real-estate-agents/milwaukee-wi/?p=2"),
-    tryFetch("homelight Milwaukee", "https://www.homelight.com/real-estate-agents/wi/milwaukee"),
-    tryFetch("realtor.com GraphQL API", "https://www.realtor.com/api/v1/hulk?client_id=rdc-x&schema=vesta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Origin": "https://www.realtor.com" },
-      body: JSON.stringify({ query: "{ __typename }" }),
+    tryFetch("zillow agents milwaukee", "https://www.zillow.com/professionals/real-estate-agent-reviews/milwaukee-wi/"),
+    tryFetch("century21 agents milwaukee", "https://www.century21.com/real-estate/agents/milwaukee-wi/"),
+    tryFetch("kw agents milwaukee", "https://www.kw.com/kw/agents.html?city=Milwaukee&state=WI"),
+    tryFetch("coldwellbanker agents", "https://www.coldwellbanker.com/real-estate-agents/milwaukee-wi"),
+    tryFetch("remax agents milwaukee", "https://www.remax.com/real-estate-agents/milwaukee-wi"),
+    tryFetch("WRA search page", "https://www.wra.org/find-a-realtor/"),
+    tryFetch("WRA search POST", "https://www.wra.org/FindaRealtor/Results/?zip=53202&radius=25", {
+      method: "GET",
     }),
-    tryFetch("WRA find realtor", "https://www.wra.org/find-a-realtor/"),
+    tryFetch("har.com milwaukee agents", "https://www.har.com/search/realtors?pn=1&city=Milwaukee&state=WI"),
   ]);
 
   return NextResponse.json(results);
