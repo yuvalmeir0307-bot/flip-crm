@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
-import { classifyReply } from "@/lib/gemini";
 import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED } from "@/lib/drip";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
+
+type ClassifyResult = "HOT" | "NO_DEAL" | "NEUTRAL";
+
+/** Keyword-based reply classifier — no API calls, no rate limits */
+function classifyReply(message: string): ClassifyResult {
+  const lower = message.toLowerCase().trim();
+
+  const noDeals = [
+    "stop", "remove", "unsubscribe", "not interested", "dont contact",
+    "don't contact", "do not contact", "leave me alone", "no thank you",
+    "no thanks", "take me off", "opt out", "cease", "desist", "lawsuit",
+    "report", "spam", "wrong number", "wrong person",
+  ];
+
+  const hots = [
+    "interested", "yes", "call me", "sounds good", "tell me more",
+    "what's the address", "whats the address", "send me", "want to know",
+    "let's talk", "lets talk", "i have a", "i've got", "i got a",
+    "can we", "would love", "great idea", "absolutely", "definitely",
+    "for sure", "of course", "sure thing", "ok let's", "ok lets",
+    "i do", "what deal", "what property", "more info", "reach out",
+  ];
+
+  if (noDeals.some((kw) => lower.includes(kw))) return "NO_DEAL";
+  if (hots.some((kw) => lower.includes(kw))) return "HOT";
+  return "NEUTRAL";
+}
 
 export async function POST(req: NextRequest) {
   try {

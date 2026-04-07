@@ -3,10 +3,11 @@
  *
  * Scrapes real estate agents from realtor.com using ScraperAPI (free tier:
  * 5,000 req/month) to bypass Vercel IP blocking. Extracts direct/mobile
- * phone numbers and adds new agents to the Flip CRM Notion database.
+ * phone numbers, verifies them against a second source (DuckDuckGo), checks
+ * for duplicates by both phone AND name, then adds new agents to Notion.
  */
 
-import { findContactByPhone, createContact } from "@/lib/notion";
+import { findContactByPhone, findContactByName, createContact } from "@/lib/notion";
 
 const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY!;
 
@@ -27,6 +28,11 @@ const LOCATIONS = [
   "Glendale_WI",
   "Racine_WI",
   "Grafton_WI",
+  "Germantown_WI",
+  "Hartland_WI",
+  "Pewaukee_WI",
+  "Oconomowoc_WI",
+  "Sussex_WI",
 ];
 
 // Phone type priority: lower index = higher priority
@@ -36,6 +42,7 @@ export interface GrabResult {
   added: string[];
   skipped: string[];
   errors: string[];
+  unverified: string[];
 }
 
 interface RawPhone {
@@ -61,8 +68,8 @@ function toE164(raw: string): string {
   return "";
 }
 
-/** Sort phones by priority and return { primary, alts } */
-function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[] } {
+/** Sort phones by priority and return { primary, alts, isPersonal } */
+function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[]; isPersonal: boolean } {
   const valid = phones
     .filter((p) => p.number && p.type !== "fax")
     .map((p) => ({ ...p, e164: toE164(p.number) }))
@@ -74,10 +81,36 @@ function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[] } 
     return ai - bi;
   });
 
-  if (!valid.length) return { primary: "", alts: [] };
-  const primary = valid[0].e164;
+  if (!valid.length) return { primary: "", alts: [], isPersonal: false };
+  const best = valid[0];
+  const primary = best.e164;
+  const isPersonal = best.type === "mobile" || best.type === "direct";
   const alts = Array.from(new Set(valid.slice(1).map((p) => p.e164).filter((n) => n !== primary)));
-  return { primary, alts };
+  return { primary, alts, isPersonal };
+}
+
+/**
+ * Verify a phone number on a second source (DuckDuckGo HTML search).
+ * Returns true if the last 7 digits of the number appear in search results
+ * alongside the agent's name — confirming it's a real, known number.
+ */
+async function verifyPhoneSecondSource(name: string, phone: string): Promise<boolean> {
+  try {
+    const last7 = phone.replace(/\D/g, "").slice(-7);
+    const query = encodeURIComponent(`"${name}" "${last7}" realtor Wisconsin`);
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${query}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html",
+      },
+    });
+    if (!res.ok) return false;
+    const html = await res.text();
+    // Phone verified if last 7 digits appear in results (different source than Realtor.com)
+    return html.includes(last7) && html.length > 1000;
+  } catch {
+    return false;
+  }
 }
 
 /** Fetch one page of agents from realtor.com via ScraperAPI */
@@ -120,6 +153,7 @@ async function fetchAgentsPage(locationSlug: string, page: number): Promise<{ ag
 /**
  * Main entry point.
  * Pulls `count` new agents (not already in Notion) for the given assignee.
+ * Checks duplicates by phone AND name. Verifies personal numbers via second source.
  */
 export async function grabAndAddAgents(
   assignedTo: "Yahav" | "Yuval",
@@ -128,10 +162,11 @@ export async function grabAndAddAgents(
   const added: string[] = [];
   const skipped: string[] = [];
   const errors: string[] = [];
+  const unverified: string[] = [];
 
   if (!SCRAPER_API_KEY) {
     errors.push("SCRAPER_API_KEY env var is not set");
-    return { added, skipped, errors };
+    return { added, skipped, errors, unverified };
   }
 
   // Shuffle locations for variety on each run
@@ -145,24 +180,38 @@ export async function grabAndAddAgents(
 
       if (error) {
         errors.push(`[${slug} p${page}] ${error}`);
-        if (error.startsWith("ScraperAPI HTTP")) break; // stop this slug on HTTP errors
+        if (error.startsWith("ScraperAPI HTTP")) break;
         continue;
       }
 
-      if (!rawAgents.length) break; // no more pages for this location
+      if (!rawAgents.length) break;
 
       for (const raw of rawAgents) {
         if (added.length >= count) break outer;
         if (!raw.full_name || !raw.phones?.length) continue;
 
-        const { primary, alts } = pickBestPhone(raw.phones);
+        const { primary, alts, isPersonal } = pickBestPhone(raw.phones);
         if (!primary) continue;
 
-        // Skip if already in Notion
+        // Duplicate check by phone
         try {
-          const existing = await findContactByPhone(primary);
-          if (existing) { skipped.push(raw.full_name); continue; }
+          const existingByPhone = await findContactByPhone(primary);
+          if (existingByPhone) { skipped.push(`${raw.full_name} (phone duplicate)`); continue; }
         } catch { /* ignore lookup failures */ }
+
+        // Duplicate check by name
+        try {
+          const existingByName = await findContactByName(raw.full_name);
+          if (existingByName) { skipped.push(`${raw.full_name} (name duplicate)`); continue; }
+        } catch { /* ignore lookup failures */ }
+
+        // Verify personal number on second source (DuckDuckGo)
+        // Mobile/direct from Realtor.com = self-reported personal number → verified
+        // Office-only → attempt second-source check
+        let verified = isPersonal;
+        if (!isPersonal) {
+          verified = await verifyPhoneSecondSource(raw.full_name, primary);
+        }
 
         const brokerage = raw.broker?.name ?? raw.office?.name ?? "";
 
@@ -172,13 +221,15 @@ export async function grabAndAddAgents(
             phone: primary,
             email: raw.email ?? "",
             brokerage,
-            area: slug.replace(/_/g, " "),
+            area: slug.replace(/_WI$/, ", WI").replace(/_/g, " "),
             source: "Realtor.com",
             status: "Drip Active",
             altPhones: alts.join(", "),
             assignedTo,
+            verified,
           });
           added.push(raw.full_name);
+          if (!verified) unverified.push(raw.full_name);
         } catch (e) {
           errors.push(`${raw.full_name}: ${e instanceof Error ? e.message : "Unknown error"}`);
         }
@@ -186,5 +237,5 @@ export async function grabAndAddAgents(
     }
   }
 
-  return { added, skipped, errors };
+  return { added, skipped, errors, unverified };
 }

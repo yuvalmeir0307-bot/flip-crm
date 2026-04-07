@@ -66,6 +66,15 @@ export async function findContactByPhone(phone: string) {
   return null;
 }
 
+export async function findContactByName(name: string): Promise<boolean> {
+  const res = await notion.databases.query({
+    database_id: DB_ID,
+    filter: { property: "Name", title: { equals: name } },
+    page_size: 1,
+  });
+  return res.results.length > 0;
+}
+
 export async function createContact(data: {
   name: string;
   phone: string;
@@ -76,6 +85,7 @@ export async function createContact(data: {
   status?: string;
   altPhones?: string;
   assignedTo?: string;
+  verified?: boolean;
 }) {
   return notion.pages.create({
     parent: { database_id: DB_ID },
@@ -88,6 +98,7 @@ export async function createContact(data: {
       ...(data.source ? { Source: { rich_text: [{ text: { content: data.source } }] } } : {}),
       ...(data.altPhones ? { "Alt Phones": { rich_text: [{ text: { content: data.altPhones } }] } } : {}),
       ...(data.assignedTo ? { "Assigned To": { rich_text: [{ text: { content: data.assignedTo } }] } } : {}),
+      ...(data.verified !== undefined ? { Verified: { checkbox: data.verified } } : {}),
       Status: { select: { name: data.status ?? "Drip Active" } },
       "Drip step": { number: 0 },
     } as Parameters<typeof notion.pages.create>[0]["properties"],
