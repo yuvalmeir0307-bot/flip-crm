@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     logs.push(`Message: "${message}"`);
 
     if (dryRun) {
-      logs.push(`Would update: step → ${isPool ? "Pool " + ((currentStep >= 9 ? 5 : currentStep + 1)) : currentStep >= 4 ? "→ The Pool" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
+      logs.push(`Would update: step → ${isPool ? "Pool " + ((currentStep >= 9 ? 1 : currentStep + 1)) : currentStep >= 4 ? "→ The Pool" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
       continue;
     }
 
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
       };
 
       if (isPool) {
-        const nextStep = currentStep >= 9 ? 5 : currentStep + 1;
+        const nextStep = currentStep >= 9 ? 1 : currentStep + 1;
         updateProps["Pool step"] = { number: nextStep };
       } else {
         if (currentStep >= 4) {

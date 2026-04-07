@@ -275,15 +275,21 @@ export default function ContactsPage() {
   async function addContact(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    await fetch("/api/contacts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newContact),
-    });
-    setNewContact({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active", assignedTo: "" });
-    setShowAdd(false);
-    setSaving(false);
-    await loadContacts();
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newContact),
+      });
+      if (!res.ok) throw new Error("Failed to save contact");
+      setNewContact({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active", assignedTo: "" });
+      setShowAdd(false);
+      await loadContacts();
+    } catch {
+      alert("Failed to save contact. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function updateStatus(id: string, status: string) {

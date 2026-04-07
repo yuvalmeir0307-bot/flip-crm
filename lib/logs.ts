@@ -85,14 +85,14 @@ export async function getActiveAlerts(): Promise<LogEntry[]> {
           },
         ],
       },
-      sorts: [{ property: "Created At", direction: "descending" }],
+      sorts: [{ timestamp: "created_time", direction: "descending" }],
       page_size: 50,
     });
     return res.results.map((p) => {
       const props = (p as { properties: Record<string, Record<string, unknown>> }).properties;
       return {
         id: (p as { id: string }).id,
-        title: ((props.Name?.title as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
+        title: ((props.Title?.title as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
         type: ((props.Type?.select as { name: string })?.name ?? "INFO") as LogType,
         phone: ((props.Phone?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",
         details: ((props.Details?.rich_text as Array<{ plain_text: string }>)?.[0]?.plain_text) ?? "",

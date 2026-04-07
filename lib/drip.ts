@@ -12,7 +12,7 @@ export function getDripScript(step: number, name: string, sender = "Yuval"): str
     1: `Hey ${name}, could you help me out? Would you be available for a quick call today?`,
     2: `Hey ${name}, are you still active with your license?`,
     3: `Hey ${name}, still looking to connect — when is a good time for a quick call this week?`,
-    4: `Hey ${name}, last check-in — if a house that needs work or a motivated seller ever comes across your desk, I'd love to hear about it. I close fast.`,
+    4: `Hey ${name}, still hoping to connect — I'm actively looking to buy and would love your help. When's a good time for a quick call?`,
   };
   return scripts[step] ?? scripts[0];
 }
@@ -35,7 +35,7 @@ export function getPoolScript(step: number, name: string): string {
 
 // Hieu timing: 5 days total (1 message per day), then 60-day pause via Pool
 export function getDripDelay(step: number): number {
-  const delays: Record<number, number> = { 0: 1, 1: 1, 2: 1, 3: 1, 4: 60 };
+  const delays: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 1, 4: 60 };
   return delays[step] ?? 1;
 }
 
