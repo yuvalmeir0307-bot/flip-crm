@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     logs.push(`Message: "${message}"`);
 
     if (dryRun) {
-      logs.push(`Would update: step → ${isPool ? "Pool " + ((currentStep >= 9 ? 1 : currentStep + 1)) : currentStep >= 4 ? "→ The Pool" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
+      logs.push(`Would update: step → ${isPool ? "Pool " + (currentStep >= 9 ? 1 : currentStep + 1) : currentStep >= 4 ? "Drip 0 (restart in 60 days)" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
       continue;
     }
 
@@ -125,8 +125,9 @@ export async function GET(req: NextRequest) {
         updateProps["Pool step"] = { number: nextStep };
       } else {
         if (currentStep >= 4) {
-          updateProps["Status"] = { select: { name: "The Pool" } };
-          updateProps["Pool step"] = { number: 1 };
+          // Non-responder — restart cold drip after 60-day pause (Hieu steps 6-10)
+          // Date is already set to +60 days above via getDripDelay(4)
+          updateProps["Drip step"] = { number: 0 };
         } else {
           updateProps["Drip step"] = { number: currentStep + 1 };
         }
