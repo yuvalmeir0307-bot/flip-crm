@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
 type Contact = {
@@ -46,6 +47,7 @@ const FILTER_TABS = [
   { label: "All", value: "", icon: "⊞" },
   { label: "New", value: "New", icon: "✦" },
   { label: "Drip Active", value: "Drip Active", icon: "◎" },
+  { label: "Replied", value: "Replied", icon: "💬" },
   { label: "Hot Leads", value: "Replied - Pivot Call Needed - HOT", icon: "🔥" },
 ];
 
@@ -259,10 +261,11 @@ function ContactDetailModal({ contact, onClose, onStatusChange }: {
 }
 
 export default function ContactsPage() {
+  const searchParams = useSearchParams();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterStatus, setFilterStatus] = useState(searchParams.get("status") ?? "");
   const [showAdd, setShowAdd] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active", assignedTo: "" });
   const [saving, setSaving] = useState(false);

@@ -461,11 +461,9 @@ export default function Dashboard() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {/* Replied to us — click to open OpenPhone */}
+                {/* Replied to us — click to open contacts filtered by Replied */}
                 <a
-                  href="https://app.openphone.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/contacts?status=Replied"
                   style={{
                     display: "block", textDecoration: "none",
                     background: "rgba(251,191,36,0.06)",
