@@ -8,6 +8,10 @@ type RunLog = {
   message: string; error: string;
 };
 
+type QACheck = { passed: boolean; score: string; failures?: string[]; missing?: string[]; slow?: string[]; warns?: string[]; warnings?: number; new_files?: number; new_file_list?: string[] };
+type QAData = { timestamp: string; overall: "PASS" | "FAIL"; duration_s: number; checks: { health: QACheck; structure: QACheck; performance: QACheck; regression: QACheck } };
+type QALog = { id: string; title: string; overall: "PASS" | "FAIL"; createdAt: string; data: QAData | null };
+
 type LogEntry = {
   id: string; title: string; type: string; phone: string;
   details: string; resolved: boolean; createdAt: string;
@@ -82,6 +86,9 @@ export default function SettingsPage() {
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsSetupNeeded, setRunsSetupNeeded] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "success" | "failed">("all");
+  const [qaLogs, setQaLogs] = useState<QALog[]>([]);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [expandedQaRun, setExpandedQaRun] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<LogEntry[]>([]);
   const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -99,9 +106,19 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (tab === "runs") { loadRuns(); loadLogs(); }
+    if (tab === "runs") { loadRuns(); loadLogs(); loadQaLogs(); }
     if (tab === "flow" && !contactsLoaded) loadContacts();
   }, [tab]);
+
+  async function loadQaLogs() {
+    setQaLoading(true);
+    try {
+      const res = await fetch("/api/qa-logs");
+      const data = await res.json();
+      if (Array.isArray(data)) setQaLogs(data);
+    } catch { /* silent */ }
+    setQaLoading(false);
+  }
 
   async function loadContacts() {
     try {
@@ -232,222 +249,306 @@ export default function SettingsPage() {
         )}
 
         {/* ═══ AUTOMATION RUNS ═══ */}
-        {tab === "runs" && (
-          <>
-            {/* Stats bar */}
-            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-              <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "16px 22px", flex: 1 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total Runs</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#e5e5e5", marginTop: 4 }}>{runs.length}</div>
-              </div>
-              <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "16px 22px", flex: 1 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Success</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#22c55e", marginTop: 4 }}>{successCount}</div>
-              </div>
-              <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "16px 22px", flex: 1 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Failed</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>{failCount}</div>
-              </div>
-              <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "16px 22px", flex: 1 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Success Rate</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#00e5ff", marginTop: 4 }}>
-                  {runs.length > 0 ? ((successCount / runs.length) * 100).toFixed(0) : 0}%
-                </div>
-              </div>
-            </div>
+        {tab === "runs" && (() => {
+          const lastQA = qaLogs[0] ?? null;
+          const lastData = lastQA?.data ?? null;
+          const allGreen = lastQA?.overall === "PASS";
+          const CHECK_LABELS: Record<string, string> = { health: "Health", structure: "Structure", performance: "Performance", regression: "Regression" };
+          const CHECK_ICONS: Record<string, string> = { health: "🌐", structure: "📁", performance: "⚡", regression: "🔁" };
 
-            {/* Filter */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              {(["all", "success", "failed"] as const).map((f) => (
-                <button key={f} onClick={() => setFilterStatus(f)} style={{
-                  padding: "6px 16px", fontSize: 12, fontWeight: 600, borderRadius: 99, cursor: "pointer",
-                  background: filterStatus === f ? (f === "success" ? "#22c55e22" : f === "failed" ? "#ef444422" : "#1a1a1a") : "transparent",
-                  border: `1px solid ${filterStatus === f ? (f === "success" ? "#22c55e" : f === "failed" ? "#ef4444" : "#333") : "#333"}`,
-                  color: filterStatus === f ? (f === "success" ? "#22c55e" : f === "failed" ? "#ef4444" : "#e5e5e5") : "#6b7280",
-                }}>
-                  {f === "all" ? "All" : f === "success" ? "Success" : "Failed"}
+          return (
+            <>
+              {/* ── QA Agent Header ── */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e5e5e5", margin: 0 }}>QA Agent</h2>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>Runs at 8:00 AM and 8:00 PM every day · Checks health, files, performance, and logic</p>
+                </div>
+                <button onClick={loadQaLogs} style={{ background: "transparent", border: "1px solid #333", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#6b7280", cursor: "pointer" }}>
+                  Refresh
                 </button>
-              ))}
-            </div>
+              </div>
 
-            {runsSetupNeeded ? (
-              <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "28px", maxWidth: 560 }}>
-                <h3 style={{ color: "#facc15", fontSize: 15, fontWeight: 700, marginBottom: 10 }}>Setup needed</h3>
-                <p style={{ color: "#9ca3af", fontSize: 13, lineHeight: 1.7 }}>
-                  Create a Notion database with fields:<br />
-                  Name · Date · Type · Phone · Step · Status · Message · Error
-                </p>
-                <code style={{ display: "block", background: "#141414", color: "#00e5ff", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginTop: 10 }}>
-                  NOTION_RUNS_DB_ID=your_database_id
-                </code>
-              </div>
-            ) : runsLoading ? (
-              <p style={{ color: "#6b7280", fontSize: 13 }}>Loading...</p>
-            ) : filteredRuns.length === 0 ? (
-              <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "28px", textAlign: "center" }}>
-                <p style={{ color: "#6b7280", fontSize: 13 }}>
-                  {runs.length === 0 ? "No automation runs yet. Run the drip to start logging." : "No runs match this filter."}
-                </p>
-              </div>
-            ) : (
-              <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      {["Status","Date","Contact","Phone","Step","Message","Error"].map((h) => (
-                        <th key={h} style={{ padding: "12px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRuns.map((r, i) => (
-                      <tr key={r.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
-                        <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                          <div style={{
-                            width: 10, height: 10, borderRadius: "50%",
-                            background: r.status === "success" ? "#22c55e" : "#ef4444",
-                            boxShadow: `0 0 8px ${r.status === "success" ? "#22c55e66" : "#ef444466"}`,
-                          }} />
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#9ca3af", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap" }}>
-                          {r.date ? new Date(r.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{r.contactName}</td>
-                        <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{r.phone}</td>
-                        <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                          <span style={{
-                            background: r.type === "Pool" ? "#a855f722" : "#00e5ff22",
-                            color: r.type === "Pool" ? "#a855f7" : "#00e5ff",
-                            fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
-                          }}>{r.step}</span>
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {r.message || "--"}
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#ef4444", borderBottom: "1px solid #1e1e1e", fontSize: 11 }}>
-                          {r.error || "--"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* ── Recent Alerts ── */}
-            <div id="alerts" style={{ marginTop: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#e5e5e5" }}>Recent Alerts</h3>
-                {alerts.length > 0 && (
-                  <span style={{
-                    background: "#ef444422", color: "#ef4444", fontSize: 11,
-                    fontWeight: 700, padding: "2px 10px", borderRadius: 99,
-                  }}>{alerts.length} open</span>
-                )}
-              </div>
-              {logsLoading ? (
-                <p style={{ color: "#6b7280", fontSize: 13 }}>Loading alerts...</p>
-              ) : alerts.length === 0 ? (
-                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px", display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
-                  <span style={{ color: "#6b7280", fontSize: 13 }}>No open alerts — system healthy</span>
+              {qaLoading ? (
+                <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 24 }}>Loading...</p>
+              ) : qaLogs.length === 0 ? (
+                /* No QA runs yet */
+                <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "32px", textAlign: "center", marginBottom: 24 }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
+                  <p style={{ color: "#6b7280", fontSize: 13 }}>No QA runs yet. The agent will run automatically at 8:00 AM and 8:00 PM.</p>
                 </div>
               ) : (
-                <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {["Type", "Title", "Phone", "Details", "Time", ""].map((h) => (
-                          <th key={h} style={{ padding: "12px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {alerts.map((a, i) => (
-                        <tr key={a.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
-                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                            <span style={{
-                              background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22",
-                              color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280",
-                              fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700,
-                            }}>{a.type}</span>
-                          </td>
-                          <td style={{ padding: "10px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{a.title}</td>
-                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{a.phone || "--"}</td>
-                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.details || "--"}</td>
-                          <td style={{ padding: "10px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>
-                            {a.createdAt ? new Date(a.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
-                          </td>
-                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                            <button
-                              onClick={() => resolveAlert(a.id)}
-                              style={{
-                                background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44",
-                                borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
-                              }}
-                            >
-                              Resolve
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                <>
+                  {/* ── Status Banner ── */}
+                  <div style={{
+                    background: allGreen ? "#052e16" : "#1c0a0a",
+                    border: `1px solid ${allGreen ? "#16a34a44" : "#dc262644"}`,
+                    borderRadius: 14, padding: "20px 24px", marginBottom: 16,
+                    display: "flex", alignItems: "center", gap: 16,
+                  }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                      background: allGreen ? "#22c55e22" : "#ef444422",
+                      border: `2px solid ${allGreen ? "#22c55e" : "#ef4444"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                    }}>
+                      {allGreen ? "✅" : "❌"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: allGreen ? "#22c55e" : "#ef4444" }}>
+                        {allGreen ? "All systems operational" : "Issues detected — action needed"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
+                        Last check: {lastQA.createdAt ? new Date(lastQA.createdAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
+                        {lastData?.duration_s ? ` · ${lastData.duration_s}s` : ""}
+                        {" · "}{qaLogs.length} run{qaLogs.length !== 1 ? "s" : ""} on record
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#4b5563", textAlign: "right" }}>
+                      <div>Next: 8:00 AM / 8:00 PM</div>
+                    </div>
+                  </div>
 
-            {/* ── Full Activity Log ── */}
-            <div style={{ marginTop: 32 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#e5e5e5", marginBottom: 14 }}>Activity Log</h3>
-              {logsLoading ? (
-                <p style={{ color: "#6b7280", fontSize: 13 }}>Loading log...</p>
-              ) : allLogs.length === 0 ? (
-                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px" }}>
-                  <p style={{ color: "#6b7280", fontSize: 13 }}>No log entries yet.</p>
-                </div>
-              ) : (
-                <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {["Type", "Title", "Phone", "Details", "Time", "Resolved"].map((h) => (
-                          <th key={h} style={{ padding: "12px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allLogs.map((l, i) => (
-                        <tr key={l.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616", opacity: l.resolved ? 0.5 : 1 }}>
-                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                            <span style={{
-                              background: (ALERT_TYPE_COLORS[l.type] ?? "#6b7280") + "22",
-                              color: ALERT_TYPE_COLORS[l.type] ?? "#6b7280",
-                              fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700,
-                            }}>{l.type}</span>
-                          </td>
-                          <td style={{ padding: "10px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{l.title}</td>
-                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{l.phone || "--"}</td>
-                          <td style={{ padding: "10px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.details || "--"}</td>
-                          <td style={{ padding: "10px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>
-                            {l.createdAt ? new Date(l.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
-                          </td>
-                          <td style={{ padding: "10px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                            {l.resolved ? (
-                              <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 600 }}>Resolved</span>
-                            ) : (
-                              <span style={{ color: "#6b7280", fontSize: 11 }}>Open</span>
+                  {/* ── 4 Check Cards ── */}
+                  {lastData && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+                      {(["health", "structure", "performance", "regression"] as const).map((key) => {
+                        const c = lastData.checks[key];
+                        const ok = c.passed;
+                        const failures = c.failures ?? c.missing ?? [];
+                        const warns = c.warns ?? [];
+                        return (
+                          <div key={key} style={{
+                            background: "#1a1a1a", borderRadius: 12, padding: "16px 18px",
+                            border: `1px solid ${ok ? "#1e1e1e" : "#ef444433"}`,
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                              <span style={{ fontSize: 13 }}>{CHECK_ICONS[key]}</span>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                background: ok ? "#22c55e22" : "#ef444422",
+                                color: ok ? "#22c55e" : "#ef4444",
+                              }}>{ok ? "PASS" : "FAIL"}</span>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#e5e5e5" }}>{CHECK_LABELS[key]}</div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: ok ? "#22c55e" : "#ef4444", margin: "6px 0 4px" }}>{c.score}</div>
+                            {!ok && failures.length > 0 && (
+                              <div style={{ fontSize: 10, color: "#ef4444", lineHeight: 1.5 }}>
+                                {failures.slice(0, 2).map((f, i) => <div key={i}>• {f}</div>)}
+                                {failures.length > 2 && <div>+{failures.length - 2} more</div>}
+                              </div>
                             )}
+                            {ok && warns.length > 0 && (
+                              <div style={{ fontSize: 10, color: "#facc15", lineHeight: 1.5 }}>
+                                ⚠️ {warns.length} warning{warns.length !== 1 ? "s" : ""}
+                              </div>
+                            )}
+                            {ok && key === "structure" && (lastData.checks.structure.new_files ?? 0) > 0 && (
+                              <div style={{ fontSize: 10, color: "#00e5ff" }}>
+                                +{lastData.checks.structure.new_files} new file{(lastData.checks.structure.new_files ?? 0) !== 1 ? "s" : ""}
+                              </div>
+                            )}
+                            {ok && !warns.length && (key !== "structure" || !(lastData.checks.structure.new_files ?? 0)) && (
+                              <div style={{ fontSize: 10, color: "#4b5563" }}>No issues</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* ── Run History ── */}
+                  <div style={{ background: "#1a1a1a", borderRadius: 14, overflow: "hidden", marginBottom: 28 }}>
+                    <div style={{ padding: "14px 18px", borderBottom: "1px solid #252525", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Run History</span>
+                      <span style={{ fontSize: 11, color: "#4b5563" }}>{qaLogs.length} runs</span>
+                    </div>
+                    {qaLogs.map((run, i) => {
+                      const isPass = run.overall === "PASS";
+                      const d = run.data;
+                      const isExpanded = expandedQaRun === run.id;
+                      const hasFail = d && !isPass;
+                      return (
+                        <div key={run.id}>
+                          <div
+                            onClick={() => setExpandedQaRun(isExpanded ? null : run.id)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 14,
+                              padding: "12px 18px", borderBottom: "1px solid #1e1e1e",
+                              background: i % 2 === 0 ? "transparent" : "#161616",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {/* Status dot */}
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: isPass ? "#22c55e" : "#ef4444", boxShadow: `0 0 6px ${isPass ? "#22c55e88" : "#ef444488"}` }} />
+
+                            {/* Time */}
+                            <span style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap", minWidth: 160 }}>
+                              {run.createdAt ? new Date(run.createdAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
+                            </span>
+
+                            {/* Check pills */}
+                            {d && (
+                              <div style={{ display: "flex", gap: 6, flex: 1 }}>
+                                {(["health", "structure", "performance", "regression"] as const).map((key) => (
+                                  <span key={key} style={{
+                                    fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
+                                    background: d.checks[key].passed ? "#22c55e22" : "#ef444422",
+                                    color: d.checks[key].passed ? "#22c55e" : "#ef4444",
+                                  }}>{CHECK_LABELS[key]}</span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Duration */}
+                            {d?.duration_s && <span style={{ fontSize: 11, color: "#4b5563", whiteSpace: "nowrap" }}>{d.duration_s}s</span>}
+
+                            {/* Expand arrow */}
+                            <span style={{ fontSize: 10, color: "#4b5563" }}>{isExpanded ? "▲" : "▼"}</span>
+                          </div>
+
+                          {/* Expanded detail */}
+                          {isExpanded && hasFail && d && (
+                            <div style={{ background: "#111", padding: "16px 18px 16px 40px", borderBottom: "1px solid #1e1e1e" }}>
+                              {(["health", "structure", "performance", "regression"] as const).map((key) => {
+                                const c = d.checks[key];
+                                if (c.passed) return null;
+                                const failures = c.failures ?? c.missing ?? c.slow ?? [];
+                                return (
+                                  <div key={key} style={{ marginBottom: 10 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: "#ef4444" }}>{CHECK_ICONS[key]} {CHECK_LABELS[key]} failed</span>
+                                    <div style={{ marginTop: 4 }}>
+                                      {failures.map((f, j) => (
+                                        <div key={j} style={{ fontSize: 11, color: "#9ca3af", paddingLeft: 12 }}>• {f}</div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* ── Divider ── */}
+              <div style={{ borderTop: "1px solid #252525", marginBottom: 24, paddingTop: 24 }}>
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 16px" }}>SMS Automation Runs</h3>
+              </div>
+
+              {/* ── SMS Runs Stats ── */}
+              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                {[
+                  { label: "Total", value: runs.length, color: "#e5e5e5" },
+                  { label: "Success", value: successCount, color: "#22c55e" },
+                  { label: "Failed", value: failCount, color: "#ef4444" },
+                  { label: "Rate", value: `${runs.length > 0 ? ((successCount / runs.length) * 100).toFixed(0) : 0}%`, color: "#00e5ff" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ background: "#1a1a1a", borderRadius: 10, padding: "12px 18px", flex: 1 }}>
+                    <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color, marginTop: 4 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── SMS Filter + Table ── */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {(["all", "success", "failed"] as const).map((f) => (
+                  <button key={f} onClick={() => setFilterStatus(f)} style={{
+                    padding: "5px 14px", fontSize: 11, fontWeight: 600, borderRadius: 99, cursor: "pointer",
+                    background: filterStatus === f ? (f === "success" ? "#22c55e22" : f === "failed" ? "#ef444422" : "#1a1a1a") : "transparent",
+                    border: `1px solid ${filterStatus === f ? (f === "success" ? "#22c55e" : f === "failed" ? "#ef4444" : "#333") : "#2a2a2a"}`,
+                    color: filterStatus === f ? (f === "success" ? "#22c55e" : f === "failed" ? "#ef4444" : "#e5e5e5") : "#6b7280",
+                  }}>
+                    {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {runsSetupNeeded ? (
+                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+                  <p style={{ color: "#facc15", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Setup needed</p>
+                  <code style={{ fontSize: 12, color: "#00e5ff" }}>NOTION_RUNS_DB_ID=your_database_id</code>
+                </div>
+              ) : runsLoading ? (
+                <p style={{ color: "#6b7280", fontSize: 13 }}>Loading...</p>
+              ) : filteredRuns.length === 0 ? (
+                <div style={{ background: "#1a1a1a", borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
+                  <p style={{ color: "#6b7280", fontSize: 13 }}>{runs.length === 0 ? "No SMS runs yet." : "No runs match this filter."}</p>
+                </div>
+              ) : (
+                <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden", marginBottom: 28 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>{["Status","Date","Contact","Phone","Step","Message","Error"].map((h) => (
+                        <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {filteredRuns.map((r, i) => (
+                        <tr key={r.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
+                          <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: r.status === "success" ? "#22c55e" : "#ef4444" }} />
                           </td>
+                          <td style={{ padding: "9px 14px", color: "#9ca3af", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap" }}>
+                            {r.date ? new Date(r.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}
+                          </td>
+                          <td style={{ padding: "9px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{r.contactName}</td>
+                          <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{r.phone}</td>
+                          <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                            <span style={{ background: r.type === "Pool" ? "#a855f722" : "#00e5ff22", color: r.type === "Pool" ? "#a855f7" : "#00e5ff", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 600 }}>{r.step}</span>
+                          </td>
+                          <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message || "--"}</td>
+                          <td style={{ padding: "9px 14px", color: "#ef4444", borderBottom: "1px solid #1e1e1e", fontSize: 11 }}>{r.error || "--"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-            </div>
-          </>
-        )}
+
+              {/* ── Recent Alerts ── */}
+              <div id="alerts" style={{ marginTop: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>System Alerts</h3>
+                  {alerts.length > 0 && <span style={{ background: "#ef444422", color: "#ef4444", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 99 }}>{alerts.length} open</span>}
+                </div>
+                {logsLoading ? <p style={{ color: "#6b7280", fontSize: 13 }}>Loading...</p>
+                  : alerts.length === 0 ? (
+                    <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} />
+                      <span style={{ color: "#6b7280", fontSize: 13 }}>No open alerts</span>
+                    </div>
+                  ) : (
+                    <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <thead><tr>{["Type","Title","Phone","Details","Time",""].map((h) => (
+                          <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        ))}</tr></thead>
+                        <tbody>{alerts.map((a, i) => (
+                          <tr key={a.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
+                            <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                              <span style={{ background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22", color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700 }}>{a.type}</span>
+                            </td>
+                            <td style={{ padding: "9px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{a.title}</td>
+                            <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{a.phone || "--"}</td>
+                            <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.details || "--"}</td>
+                            <td style={{ padding: "9px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>{a.createdAt ? new Date(a.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}</td>
+                            <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                              <button onClick={() => resolveAlert(a.id)} style={{ background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Resolve</button>
+                            </td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  )}
+              </div>
+            </>
+          );
+        })()}
 
         {/* ═══ SMS FLOW ═══ */}
         {tab === "flow" && (

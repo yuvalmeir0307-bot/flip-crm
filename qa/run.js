@@ -49,7 +49,7 @@ async function main() {
   console.log('═'.repeat(60));
 
   // Log to Notion
-  await logQARun(runResult);
+  await logQARun(runResult, Date.now() - startTime);
 
   // Send SMS
   await sendAlerts(runResult);

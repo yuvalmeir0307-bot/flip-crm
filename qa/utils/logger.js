@@ -53,63 +53,63 @@ async function createNotionLog({ title, type, details, phone = '' }) {
   }
 }
 
-function formatQAReport(runResult, timestamp) {
+function formatQAReport(runResult, timestamp, durationMs) {
   const { health, structure, performance, regression } = runResult;
   const allPassed = [health, structure, performance, regression].every(r => r.passed);
 
-  const lines = [
-    `QA Run — ${timestamp}`,
-    `Overall: ${allPassed ? 'ALL PASSED' : 'FAILURES DETECTED'}`,
-    '',
-    `Health:      ${health.summary.passed}/${health.summary.total} ✓`,
-    `Structure:   ${structure.summary.present}/${structure.summary.total} files present`,
-    `Performance: ${performance.summary.ok} OK, ${performance.summary.warnings} warnings, ${performance.summary.failed} failed`,
-    `Regression:  ${regression.summary.passed}/${regression.summary.total} ✓`,
-  ];
+  // Store as structured JSON so the Settings page can parse and display it cleanly
+  const structured = {
+    timestamp,
+    overall: allPassed ? 'PASS' : 'FAIL',
+    duration_s: durationMs ? parseFloat((durationMs / 1000).toFixed(1)) : null,
+    checks: {
+      health: {
+        passed: health.passed,
+        score: `${health.summary.passed}/${health.summary.total}`,
+        failures: health.failures?.map(f => f.name) || [],
+      },
+      structure: {
+        passed: structure.passed,
+        score: `${structure.summary.present}/${structure.summary.total}`,
+        missing: structure.failures?.map(f => f.name) || [],
+        new_files: (structure.new_files?.api_routes?.length || 0) +
+                   (structure.new_files?.lib_files?.length || 0) +
+                   (structure.new_files?.pages?.length || 0),
+        new_file_list: [
+          ...(structure.new_files?.api_routes || []),
+          ...(structure.new_files?.lib_files || []),
+          ...(structure.new_files?.pages || []),
+        ],
+      },
+      performance: {
+        passed: performance.passed,
+        score: `${performance.summary.ok}/${performance.summary.total}`,
+        warnings: performance.summary.warnings,
+        slow: performance.failures?.map(f => `${f.name} (${f.error})`) || [],
+        warns: performance.warnings?.map(w => `${w.name}: ${w.message}`) || [],
+      },
+      regression: {
+        passed: regression.passed,
+        score: `${regression.summary.passed}/${regression.summary.total}`,
+        failures: regression.failures?.map(f => f.name) || [],
+      },
+    },
+  };
 
-  if (!allPassed) {
-    lines.push('', '--- FAILURES ---');
-
-    for (const check of [health, structure, performance, regression]) {
-      if (!check.passed && check.failures?.length > 0) {
-        lines.push(`\n[${check.category.toUpperCase()}]`);
-        for (const f of check.failures) {
-          lines.push(`  • ${f.name || f.file}: ${f.error}`);
-        }
-      }
-    }
-  }
-
-  if (performance.warnings?.length > 0) {
-    lines.push('', '--- PERFORMANCE WARNINGS ---');
-    for (const w of performance.warnings) {
-      lines.push(`  ⚠️  ${w.name}: ${w.message}`);
-    }
-  }
-
-  if (structure.new_files) {
-    const { api_routes, lib_files, pages } = structure.new_files;
-    const hasNew = api_routes.length + lib_files.length + pages.length > 0;
-    if (hasNew) {
-      lines.push('', '--- NEW FILES (since baseline) ---');
-      [...api_routes, ...lib_files, ...pages].forEach(f => lines.push(`  + ${f}`));
-    }
-  }
-
-  return lines.join('\n');
+  return JSON.stringify(structured);
 }
 
-async function logQARun(runResult) {
+async function logQARun(runResult, durationMs) {
   const timestamp = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
   const allPassed = ['health', 'structure', 'performance', 'regression']
     .every(k => runResult[k]?.passed);
 
   const title = allPassed
-    ? `✅ QA PASS — ${timestamp}`
-    : `❌ QA FAIL — ${timestamp}`;
+    ? `QA_PASS — ${timestamp}`
+    : `QA_FAIL — ${timestamp}`;
 
-  const type = allPassed ? 'INFO' : 'FAILED_SMS'; // reuse existing Notion log types
-  const details = formatQAReport(runResult, timestamp);
+  const type = allPassed ? 'INFO' : 'FAILED_SMS';
+  const details = formatQAReport(runResult, timestamp, durationMs);
 
   console.log('\n📋 Logging to Notion...');
   const page = await createNotionLog({ title, type, details });

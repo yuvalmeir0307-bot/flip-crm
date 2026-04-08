@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/api/cron/",
   "/api/admin/backfill-assignments",
   "/api/logs",
+  "/api/qa-logs",
   "/api/setup-logs",
 ];
 
