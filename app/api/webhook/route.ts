@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
 import { classifyReply } from "@/lib/gemini";
-import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED, STATUS_POOL, calculateNextDate } from "@/lib/drip";
+import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED } from "@/lib/drip";
 import { sendSMS, getSenderByName, getSender } from "@/lib/openphone";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 import { createLog } from "@/lib/logs";
@@ -71,10 +71,8 @@ export async function POST(req: NextRequest) {
           // If Gemini fails, still save the reply
         }
       } else {
-        // Phone call — move to Pool (post-conversation nurture)
-        updateProps.Status = { select: { name: STATUS_POOL } };
-        updateProps["Pool step"] = { number: 1 };
-        updateProps["Date"] = { date: { start: calculateNextDate(7) } };
+        // Phone call — mark HOT for manual follow-up
+        updateProps.Status = { select: { name: STATUS_HOT } };
       }
     }
 
