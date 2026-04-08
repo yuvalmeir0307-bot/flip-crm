@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
@@ -260,7 +260,7 @@ function ContactDetailModal({ contact, onClose, onStatusChange }: {
   );
 }
 
-export default function ContactsPage() {
+function ContactsPageInner() {
   const searchParams = useSearchParams();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -491,4 +491,8 @@ export default function ContactsPage() {
       </div>
     </div>
   );
+}
+
+export default function ContactsPage() {
+  return <Suspense fallback={null}><ContactsPageInner /></Suspense>;
 }
