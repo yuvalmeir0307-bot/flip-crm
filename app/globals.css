@@ -64,6 +64,30 @@ select option { background: #1a1a1a; }
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
+.kpi-grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.dashboard-header-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.dashboard-goals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
 
 /* ── Mobile breakpoint ── */
 @media (max-width: 768px) {
@@ -137,6 +161,8 @@ select option { background: #1a1a1a; }
   .kpi-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
   .kpi-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
   .kpi-grid-2 { grid-template-columns: 1fr !important; }
+  .kpi-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+  .dashboard-goals-grid { grid-template-columns: 1fr !important; }
 
   /* Smaller fonts on mobile */
   h1 { font-size: 20px !important; }

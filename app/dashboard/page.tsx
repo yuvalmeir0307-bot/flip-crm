@@ -197,12 +197,12 @@ export default function Dashboard() {
 
       <div className="app-main">
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+        <div className="dashboard-header">
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827" }}>Dashboard</h1>
             <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 2 }}>Welcome back, Yuval and Yahav</p>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="dashboard-header-buttons">
             {(["Yahav", "Yuval"] as const).map((person) => (
               <button
                 key={person}
@@ -416,7 +416,7 @@ export default function Dashboard() {
           </div>
 
           {/* Goals Row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div className="dashboard-goals-grid">
 
             {/* Daily Goal: Send 10 Messages */}
             <div style={{
@@ -497,7 +497,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="kpi-grid-2" style={{ gap: 12 }}>
                 {/* Replied to us — click to open OpenPhone inbox */}
                 <a
                   href="https://my.quo.com/inbox/PNpvAhCQ3j/c/CN7d1304260ddf4114a378ede6b6a29c79"
@@ -571,7 +571,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
+        <div className="kpi-grid-5" style={{ marginBottom: 24 }}>
           {stats.map((s) => (
             <div key={s.label} style={{
               background: "#1a1a1a", borderRadius: 14, padding: "20px 20px 16px",
@@ -592,7 +592,7 @@ export default function Dashboard() {
         </div>
 
         {/* Charts Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+        <div className="kpi-grid-2" style={{ marginBottom: 24 }}>
           {/* Drip Activity Chart */}
           <div style={{ background: "#1a1a1a", borderRadius: 14, padding: "20px 24px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -659,6 +659,7 @@ export default function Dashboard() {
           ) : dueToday.length === 0 ? (
             <p style={{ color: "#555", fontSize: 14 }}>No contacts due today.</p>
           ) : (
+            <div className="table-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ color: "#444", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -689,6 +690,7 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
           )}
         </div>
 
