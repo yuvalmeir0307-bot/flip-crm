@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [runningCron, setRunningCron] = useState(false);
   const [cronLogs, setCronLogs] = useState<string[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [previewContacts, setPreviewContacts] = useState<Contact[]>([]);
   const [grabLoading, setGrabLoading] = useState<Record<string, boolean>>({});
   const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
@@ -220,7 +221,16 @@ export default function Dashboard() {
               </button>
             ))}
             <button
-              onClick={() => setShowConfirm(true)}
+              onClick={() => {
+                const todayStr = new Date().toISOString().split("T")[0];
+                const preview = contacts.filter((c) =>
+                  c.status === "Drip Active" &&
+                  (c.dripStep || 0) === 0 &&
+                  (!c.date || c.date <= todayStr)
+                );
+                setPreviewContacts(preview);
+                setShowConfirm(true);
+              }}
               disabled={runningCron}
               style={{
                 background: "#1a1a1a", color: "#fff", border: "none",
@@ -279,12 +289,35 @@ export default function Dashboard() {
               background: "#1a1a1a", borderRadius: 16, padding: "32px 28px", width: 400, maxWidth: "90vw",
               border: "1px solid #333", boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
             }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Are you sure?</div>
-              <p style={{ color: "#9ca3af", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
-                This will send the <span style={{ color: "#00e5ff", fontWeight: 600 }}>first SMS</span> to{" "}
-                <span style={{ color: "#00e5ff", fontWeight: 700 }}>{step0Count}</span> new contacts at Step 0.
-                <br />Messages will be sent immediately and cannot be undone.
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 4 }}>📋 Review before sending</div>
+              <p style={{ color: "#9ca3af", fontSize: 13, marginBottom: 14 }}>
+                {previewContacts.length === 0
+                  ? "No contacts due for first message today."
+                  : <>Will send <span style={{ color: "#00e5ff", fontWeight: 700 }}>Step 0</span> to <span style={{ color: "#00e5ff", fontWeight: 700 }}>{previewContacts.length}</span> contact{previewContacts.length !== 1 ? "s" : ""}:</>
+                }
               </p>
+
+              {previewContacts.length > 0 && (
+                <div style={{
+                  background: "#111", borderRadius: 10, padding: "10px 14px", marginBottom: 18,
+                  maxHeight: 180, overflowY: "auto", border: "1px solid #2a2a2a",
+                }}>
+                  {previewContacts.map((c) => (
+                    <div key={c.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "6px 0", borderBottom: "1px solid #1e1e1e",
+                    }}>
+                      <span style={{ color: "#e5e5e5", fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                      <span style={{ color: "#6b7280", fontSize: 11, fontFamily: "monospace" }}>{c.phone}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ color: "#ef444488", fontSize: 12, marginBottom: 16 }}>
+                Messages will be sent immediately and cannot be undone.
+              </p>
+
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                 <button
                   onClick={() => setShowConfirm(false)}
@@ -297,12 +330,16 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={runDrip}
+                  disabled={previewContacts.length === 0}
                   style={{
-                    background: "#00e5ff", border: "none", color: "#000",
+                    background: previewContacts.length === 0 ? "#333" : "#00e5ff",
+                    border: "none",
+                    color: previewContacts.length === 0 ? "#666" : "#000",
                     borderRadius: 8, padding: "10px 24px", fontSize: 14, fontWeight: 700,
+                    cursor: previewContacts.length === 0 ? "not-allowed" : "pointer",
                   }}
                 >
-                  Yes, Send Now
+                  {previewContacts.length === 0 ? "Nothing to send" : `Send to ${previewContacts.length} contact${previewContacts.length !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
