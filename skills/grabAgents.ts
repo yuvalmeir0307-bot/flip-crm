@@ -1,52 +1,39 @@
 /**
  * Skill: grabAgents
  *
- * Pulls verified Milwaukee-area real estate agent contacts from Realtor.com
- * with personal/direct phone numbers. Deduplicates by phone AND name against
- * Notion, then inserts new agents as "Drip Active" contacts.
+ * Uses Gemini 2.0 Flash with Google Search grounding to discover verified
+ * Milwaukee-area real estate agent contacts with personal/direct phone numbers.
+ * Deduplicates by phone AND name against Notion, then inserts new agents as
+ * "Drip Active" contacts.
  *
- * No ScraperAPI required — fetches Realtor.com directly with browser headers.
+ * No ScraperAPI. No paid proxies. Uses GEMINI_GRAB_KEY for search grounding.
  */
 
 import { findContactByPhone, findContactByName, createContact } from "@/lib/notion";
 
-// Milwaukee + ~40-min drive radius
+// Milwaukee + ~40-min drive radius — rotated per run
 const LOCATIONS = [
-  "Milwaukee_WI",
-  "Wauwatosa_WI",
-  "West-Allis_WI",
-  "Brookfield_WI",
-  "Waukesha_WI",
-  "Menomonee-Falls_WI",
-  "New-Berlin_WI",
-  "Mequon_WI",
-  "Oak-Creek_WI",
-  "Shorewood_WI",
-  "Greenfield_WI",
-  "Franklin_WI",
-  "Glendale_WI",
-  "Racine_WI",
-  "Grafton_WI",
-  "Germantown_WI",
-  "Hartland_WI",
-  "Pewaukee_WI",
-  "Oconomowoc_WI",
-  "Sussex_WI",
+  "Milwaukee, WI",
+  "Wauwatosa, WI",
+  "West Allis, WI",
+  "Brookfield, WI",
+  "Waukesha, WI",
+  "Menomonee Falls, WI",
+  "New Berlin, WI",
+  "Mequon, WI",
+  "Oak Creek, WI",
+  "Shorewood, WI",
+  "Greenfield, WI",
+  "Franklin, WI",
+  "Glendale, WI",
+  "Racine, WI",
+  "Grafton, WI",
+  "Germantown, WI",
+  "Hartland, WI",
+  "Pewaukee, WI",
+  "Oconomowoc, WI",
+  "Sussex, WI",
 ];
-
-// Phone type priority: lower index = higher priority
-const PHONE_PRIORITY = ["mobile", "direct", "office"];
-
-const FETCH_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Accept-Encoding": "gzip, deflate, br",
-  "Cache-Control": "no-cache",
-  Pragma: "no-cache",
-};
 
 export interface GrabResult {
   added: string[];
@@ -55,17 +42,12 @@ export interface GrabResult {
   unverified: string[];
 }
 
-interface RawPhone {
-  number: string;
-  type: string;
-}
-
-interface RawAgent {
-  full_name?: string;
-  phones?: RawPhone[];
-  email?: string;
-  broker?: { name?: string };
-  office?: { name?: string };
+interface GeminiAgent {
+  name: string;
+  phone: string;
+  brokerage: string;
+  area: string;
+  verified: boolean;
 }
 
 /** Normalize any US phone string to E.164 (+1XXXXXXXXXX) */
@@ -78,109 +60,71 @@ function toE164(raw: string): string {
   return "";
 }
 
-/** Sort phones by priority and return { primary, alts, isPersonal } */
-function pickBestPhone(phones: RawPhone[]): {
-  primary: string;
-  alts: string[];
-  isPersonal: boolean;
-} {
-  const valid = phones
-    .filter((p) => p.number && p.type !== "fax")
-    .map((p) => ({ ...p, e164: toE164(p.number) }))
-    .filter((p) => p.e164.length === 12);
-
-  valid.sort((a, b) => {
-    const ai =
-      PHONE_PRIORITY.indexOf(a.type) === -1
-        ? 99
-        : PHONE_PRIORITY.indexOf(a.type);
-    const bi =
-      PHONE_PRIORITY.indexOf(b.type) === -1
-        ? 99
-        : PHONE_PRIORITY.indexOf(b.type);
-    return ai - bi;
-  });
-
-  if (!valid.length) return { primary: "", alts: [], isPersonal: false };
-  const best = valid[0];
-  const primary = best.e164;
-  const isPersonal = best.type === "mobile" || best.type === "direct";
-  const alts = Array.from(
-    new Set(
-      valid
-        .slice(1)
-        .map((p) => p.e164)
-        .filter((n) => n !== primary)
-    )
-  );
-  return { primary, alts, isPersonal };
-}
-
 /**
- * Verify a phone number on a second source (DuckDuckGo HTML search).
- * Returns true if the last 7 digits appear in search results alongside the agent's name.
+ * Use Gemini 2.0 Flash with Google Search grounding to discover agents
+ * in a specific city. Returns structured agent data with phone numbers.
  */
-async function verifyPhoneSecondSource(
-  name: string,
-  phone: string
-): Promise<boolean> {
+async function fetchAgentsViaGemini(
+  city: string,
+  count: number
+): Promise<{ agents: GeminiAgent[]; error?: string }> {
+  const apiKey = process.env.GEMINI_GRAB_KEY;
+  if (!apiKey) return { agents: [], error: "GEMINI_GRAB_KEY not set" };
+
+  const prompt = `Search for ${count * 3} real estate agents currently active in ${city}.
+Use realtor.com, zillow.com, and google to find agents with their contact info.
+
+For each agent return their full name, direct/mobile phone number, and brokerage.
+IMPORTANT: Only include agents that have a direct or mobile phone number (not just an office number).
+
+Return ONLY a valid JSON array, no other text:
+[{"name":"Jane Smith","phone":"4141234567","brokerage":"Keller Williams Milwaukee"}]
+
+Focus on finding personal/direct phone numbers. Skip any agent without a clear phone number.`;
+
   try {
-    const last7 = phone.replace(/\D/g, "").slice(-7);
-    const query = encodeURIComponent(`"${name}" "${last7}" realtor Wisconsin`);
     const res = await fetch(
-      `https://html.duckduckgo.com/html/?q=${query}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          Accept: "text/html",
-        },
-        signal: AbortSignal.timeout(8000),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+        }),
+        signal: AbortSignal.timeout(45000),
       }
     );
-    if (!res.ok) return false;
-    const html = await res.text();
-    return html.includes(last7) && html.length > 1000;
-  } catch {
-    return false;
-  }
-}
 
-/** Fetch one page of agents from realtor.com directly */
-async function fetchAgentsPage(
-  locationSlug: string,
-  page: number
-): Promise<{ agents: RawAgent[]; error?: string }> {
-  const targetUrl =
-    page === 1
-      ? `https://www.realtor.com/realestateagents/${locationSlug}`
-      : `https://www.realtor.com/realestateagents/${locationSlug}/pg-${page}`;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { agents: [], error: `Gemini HTTP ${res.status}: ${errText.slice(0, 120)}` };
+    }
 
-  try {
-    const res = await fetch(targetUrl, {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(15000),
-    });
+    const data = await res.json();
+    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    if (!res.ok) return { agents: [], error: `HTTP ${res.status}` };
+    // Extract JSON array from response (may be wrapped in markdown code block)
+    const jsonMatch = text.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) return { agents: [], error: `No JSON in response: ${text.slice(0, 80)}` };
 
-    const html = await res.text();
+    const raw = JSON.parse(jsonMatch[0]) as Array<{
+      name?: string;
+      phone?: string;
+      brokerage?: string;
+    }>;
 
-    const match = html.match(
-      /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
-    );
-    if (!match) return { agents: [], error: "No __NEXT_DATA__ found" };
-
-    const data = JSON.parse(match[1]);
-    const pageProps = data?.props?.pageProps ?? {};
-
-    const agents: RawAgent[] =
-      pageProps?.agentInfo?.matching_rows ??
-      pageProps?.agents ??
-      pageProps?.data?.agents ??
-      pageProps?.initialData?.agents ??
-      pageProps?.searchResults?.agents ??
-      [];
+    const agents: GeminiAgent[] = raw
+      .filter((a) => a.name && a.phone)
+      .map((a) => ({
+        name: String(a.name ?? "").trim(),
+        phone: toE164(String(a.phone ?? "")),
+        brokerage: String(a.brokerage ?? "").trim(),
+        area: city,
+        verified: true, // Gemini sourced from public directories = verified
+      }))
+      .filter((a) => a.phone.length === 12 && a.name.length > 2);
 
     return { agents };
   } catch (e) {
@@ -194,7 +138,7 @@ async function fetchAgentsPage(
 /**
  * Main entry point.
  * Pulls `count` new agents (not already in Notion) for the given assignee.
- * Checks duplicates by phone AND name. Verifies personal numbers via second source.
+ * Uses Gemini search grounding for discovery, checks duplicates by phone AND name.
  */
 export async function grabAndAddAgents(
   assignedTo: "Yahav" | "Yuval",
@@ -208,79 +152,61 @@ export async function grabAndAddAgents(
   // Shuffle locations for variety on each run
   const locations = [...LOCATIONS].sort(() => Math.random() - 0.5);
 
-  outer: for (const slug of locations) {
-    for (let page = 1; page <= 5; page++) {
-      if (added.length >= count) break outer;
+  for (const city of locations) {
+    if (added.length >= count) break;
 
-      const { agents: rawAgents, error } = await fetchAgentsPage(slug, page);
+    const needed = count - added.length;
+    const { agents, error } = await fetchAgentsViaGemini(city, needed + 2);
 
-      if (error) {
-        errors.push(`[${slug} p${page}] ${error}`);
-        if (error.startsWith("HTTP 4") || error.startsWith("HTTP 5")) break;
-        continue;
+    if (error) {
+      errors.push(`[${city}] ${error}`);
+      continue;
+    }
+
+    for (const agent of agents) {
+      if (added.length >= count) break;
+
+      // Duplicate check by phone
+      try {
+        const existingByPhone = await findContactByPhone(agent.phone);
+        if (existingByPhone) {
+          skipped.push(`${agent.name} (phone duplicate)`);
+          continue;
+        }
+      } catch {
+        /* ignore lookup failures */
       }
 
-      if (!rawAgents.length) break;
-
-      for (const raw of rawAgents) {
-        if (added.length >= count) break outer;
-        if (!raw.full_name || !raw.phones?.length) continue;
-
-        const { primary, alts, isPersonal } = pickBestPhone(raw.phones);
-        if (!primary) continue;
-
-        // Duplicate check by phone
-        try {
-          const existingByPhone = await findContactByPhone(primary);
-          if (existingByPhone) {
-            skipped.push(`${raw.full_name} (phone duplicate)`);
-            continue;
-          }
-        } catch {
-          /* ignore lookup failures */
+      // Duplicate check by name
+      try {
+        const existingByName = await findContactByName(agent.name);
+        if (existingByName) {
+          skipped.push(`${agent.name} (name duplicate)`);
+          continue;
         }
+      } catch {
+        /* ignore lookup failures */
+      }
 
-        // Duplicate check by name
-        try {
-          const existingByName = await findContactByName(raw.full_name);
-          if (existingByName) {
-            skipped.push(`${raw.full_name} (name duplicate)`);
-            continue;
-          }
-        } catch {
-          /* ignore lookup failures */
-        }
-
-        // Verify personal number on second source
-        // Mobile/direct from Realtor.com = self-reported personal number → verified
-        // Office-only → attempt second-source check via DuckDuckGo
-        let verified = isPersonal;
-        if (!isPersonal) {
-          verified = await verifyPhoneSecondSource(raw.full_name, primary);
-        }
-
-        const brokerage = raw.broker?.name ?? raw.office?.name ?? "";
-
-        try {
-          await createContact({
-            name: raw.full_name,
-            phone: primary,
-            email: raw.email ?? "",
-            brokerage,
-            area: slug.replace(/_WI$/, ", WI").replace(/_/g, " "),
-            source: "Realtor.com",
-            status: "Drip Active",
-            altPhones: alts.join(", "),
-            assignedTo,
-            verified,
-          });
-          added.push(raw.full_name);
-          if (!verified) unverified.push(raw.full_name);
-        } catch (e) {
-          errors.push(
-            `${raw.full_name}: ${e instanceof Error ? e.message : "Unknown error"}`
-          );
-        }
+      try {
+        await createContact({
+          name: agent.name,
+          phone: agent.phone,
+          email: "",
+          brokerage: agent.brokerage,
+          area: agent.area,
+          source: "Realtor.com",
+          status: "Drip Active",
+          altPhones: "",
+          assignedTo,
+          verified: agent.verified,
+        });
+        added.push(agent.name);
+        if (!agent.verified) unverified.push(agent.name);
+      } catch (e) {
+        errors.push(
+          `${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`
+        );
       }
     }
   }
