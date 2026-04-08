@@ -1,0 +1,52 @@
+name: Flip CRM — QA Agent
+
+on:
+  schedule:
+    # 8:00 AM Israel time (IDT = UTC+3) = 05:00 UTC
+    - cron: '0 5 * * *'
+    # 8:00 PM Israel time (IDT = UTC+3) = 17:00 UTC
+    - cron: '0 17 * * *'
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual run'
+        required: false
+        default: 'Manual check'
+
+jobs:
+  qa:
+    name: QA Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run QA Agent
+        working-directory: qa
+        env:
+          SITE_URL:             https://flip-crm-two.vercel.app
+          NOTION_API_TOKEN:     ${{ secrets.NOTION_API_TOKEN }}
+          NOTION_LOGS_DB:       ${{ secrets.NOTION_LOGS_DB }}
+          OPENPHONE_API_KEY:    ${{ secrets.OPENPHONE_API_KEY }}
+          YUVAL_PHONE_NUMBER:   ${{ secrets.YUVAL_PHONE_NUMBER }}
+          YUVAL_PERSONAL_PHONE: ${{ secrets.YUVAL_PERSONAL_PHONE }}
+          YAHAV_PERSONAL_PHONE: ${{ secrets.YAHAV_PERSONAL_PHONE }}
+          ADMIN_PASSWORD:       ${{ secrets.ADMIN_PASSWORD }}
+          CRON_SECRET:          ${{ secrets.CRON_SECRET }}
+        run: node run.js
+
+      - name: Upload QA log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-failure-log-${{ github.run_id }}
+          path: qa/
+          retention-days: 7

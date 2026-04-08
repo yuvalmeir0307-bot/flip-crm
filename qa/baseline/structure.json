@@ -1,0 +1,49 @@
+{
+  "description": "Baseline folder structure for Flip CRM — generated 2026-04-07",
+  "critical_files": [
+    "app/layout.tsx",
+    "app/page.tsx",
+    "app/globals.css",
+    "middleware.ts",
+    "vercel.json",
+    "tsconfig.json",
+    "package.json"
+  ],
+  "critical_pages": [
+    "app/login/page.tsx",
+    "app/dashboard/page.tsx",
+    "app/contacts/page.tsx",
+    "app/opportunities/page.tsx",
+    "app/scripts/page.tsx",
+    "app/insights/page.tsx",
+    "app/settings/page.tsx"
+  ],
+  "critical_api_routes": [
+    "app/api/auth/login/route.ts",
+    "app/api/auth/logout/route.ts",
+    "app/api/contacts/route.ts",
+    "app/api/logs/route.ts",
+    "app/api/runs/route.ts",
+    "app/api/webhook/route.ts",
+    "app/api/scripts/route.ts",
+    "app/api/cron/drip/route.ts",
+    "app/api/cron/daily-report/route.ts",
+    "app/api/cron/check-duplicates/route.ts"
+  ],
+  "critical_libs": [
+    "lib/auth.ts",
+    "lib/drip.ts",
+    "lib/notion.ts",
+    "lib/openphone.ts",
+    "lib/logs.ts",
+    "lib/gemini.ts",
+    "lib/scripts.ts"
+  ],
+  "critical_components": [
+    "components/Sidebar.tsx"
+  ],
+  "critical_skills": [
+    "skills/grabAgents.ts",
+    "skills/syncContactToOpenPhone.ts"
+  ]
+}

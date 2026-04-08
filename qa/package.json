@@ -1,0 +1,16 @@
+{
+  "name": "flip-crm-qa",
+  "version": "1.0.0",
+  "description": "QA Agent for Flip CRM — runs twice daily",
+  "main": "run.js",
+  "scripts": {
+    "qa": "node run.js",
+    "qa:health": "node -e \"require('./checks/health').runHealthChecks().then(console.log)\"",
+    "qa:structure": "node -e \"require('./checks/structure').runStructureCheck().then(console.log)\"",
+    "qa:performance": "node -e \"require('./checks/performance').runPerformanceChecks().then(console.log)\"",
+    "qa:regression": "node -e \"require('./checks/regression').runRegressionTests().then(console.log)\""
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
