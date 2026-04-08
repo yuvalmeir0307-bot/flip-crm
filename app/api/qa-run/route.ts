@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createLog } from "@/lib/logs";
+import { createRunLog } from "@/lib/notion";
 
 const BASE_URL = process.env.NEXT_PUBLIC_URL || "https://flip-crm-two.vercel.app";
 const CRON_SECRET = process.env.CRON_SECRET || "flip123secret";
@@ -102,9 +103,33 @@ export async function POST(req: Request) {
     },
   };
 
-  // ── Log to Notion ──────────────────────────────────────────
+  // ── Log to Notion System Logs ──────────────────────────────
   const title = `${overall === "PASS" ? "QA_PASS" : "QA_FAIL"} — ${result.timestamp} (manual)`;
   await createLog(title, overall === "PASS" ? "INFO" : "FAILED_SMS", undefined, JSON.stringify(result).substring(0, 2000));
+
+  // ── Log to Runs DB (SMS Automation Runs table) ─────────────
+  const allFailures = [
+    ...result.checks.health.failures,
+    ...result.checks.regression.failures,
+    ...result.checks.performance.failures,
+  ];
+  const summary = [
+    `Health ${result.checks.health.score}`,
+    `Regression ${result.checks.regression.score}`,
+    `Perf ${result.checks.performance.score}`,
+    `${result.duration_s}s`,
+  ].join(" · ");
+
+  await createRunLog({
+    date: new Date().toISOString(),
+    type: "QA",
+    contactName: "QA Agent",
+    phone: "system",
+    step: overall,
+    status: overall === "PASS" ? "success" : "failed",
+    message: summary,
+    error: allFailures.slice(0, 3).join(", "),
+  });
 
   return NextResponse.json(result);
 }
