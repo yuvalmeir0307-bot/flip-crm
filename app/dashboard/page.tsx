@@ -461,9 +461,11 @@ export default function Dashboard() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {/* Replied to us — click to open contacts filtered by Replied */}
+                {/* Replied to us — click to open OpenPhone inbox */}
                 <a
-                  href="/contacts?status=Replied"
+                  href="https://my.quo.com/inbox/PNpvAhCQ3j/c/CN7d1304260ddf4114a378ede6b6a29c79"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     display: "block", textDecoration: "none",
                     background: "rgba(251,191,36,0.06)",
