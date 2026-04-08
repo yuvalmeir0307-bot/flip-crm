@@ -406,11 +406,16 @@ type Contact = {
   arv?: number;
   rehabCost?: number;
   monthlyRent?: number;
-  dealMode?: "flip" | "rental";
+  dealMode?: "flip" | "rental" | "jerry";
   flipFactor?: number;
   capRate?: number;
   expenseRatio?: number;
   maoOverride?: number | null;
+  zillow?: number;
+  realtorCom?: number;
+  redfin?: number;
+  source4?: number;
+  wholesaleFeeOverride?: number | null;
 };
 
 const WARMTH_OPTIONS = ["Cold", "Warm", "Hot"];
@@ -783,12 +788,21 @@ function formatCurrency(val: number): string {
   return "$" + Math.round(val).toLocaleString("en-US");
 }
 
+function getJerryTier(asis: number): { exitPct: number; defaultFee: number; offerPct: number; label: string } {
+  if (asis < 100000)  return { exitPct: 0.35, defaultFee: 10000, offerPct: 0.55, label: "Under $100K" };
+  if (asis < 200000)  return { exitPct: 0.50, defaultFee: 20000, offerPct: 0.65, label: "$100K–$200K" };
+  if (asis < 300000)  return { exitPct: 0.60, defaultFee: 25000, offerPct: 0.75, label: "$200K–$300K" };
+  if (asis < 400000)  return { exitPct: 0.65, defaultFee: 30000, offerPct: 0.75, label: "$300K–$400K" };
+  if (asis < 500000)  return { exitPct: 0.70, defaultFee: 35000, offerPct: 0.75, label: "$400K–$500K" };
+  return               { exitPct: 0.72, defaultFee: 40000, offerPct: 0.75, label: "$500K+" };
+}
+
 function MAOSection({ contact, onSave }: {
   contact: Contact;
   onSave: (id: string, data: Partial<Contact>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [dealMode, setDealMode] = useState<"flip" | "rental">(contact.dealMode ?? "flip");
+  const [dealMode, setDealMode] = useState<"flip" | "rental" | "jerry">(contact.dealMode ?? "jerry");
   const [arv, setArv] = useState(contact.arv ?? 0);
   const [rehabCost, setRehabCost] = useState(contact.rehabCost ?? 0);
   const [monthlyRent, setMonthlyRent] = useState(contact.monthlyRent ?? 0);
@@ -796,40 +810,77 @@ function MAOSection({ contact, onSave }: {
   const [capRate, setCapRate] = useState(contact.capRate ?? 8);
   const [expenseRatio, setExpenseRatio] = useState(contact.expenseRatio ?? 40);
   const [maoOverride, setMaoOverride] = useState<string>(contact.maoOverride != null ? String(contact.maoOverride) : "");
+  // Jerry mode state
+  const [zillow, setZillow] = useState(contact.zillow ?? 0);
+  const [realtorCom, setRealtorCom] = useState(contact.realtorCom ?? 0);
+  const [redfin, setRedfin] = useState(contact.redfin ?? 0);
+  const [source4, setSource4] = useState(contact.source4 ?? 0);
+  const [wholesaleFeeOverride, setWholesaleFeeOverride] = useState<string>(
+    contact.wholesaleFeeOverride != null ? String(contact.wholesaleFeeOverride) : ""
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Flip / Rental calcs
   const calcFlipMAO = arv * (flipFactor / 100) - rehabCost;
   const netMonthlyIncome = monthlyRent * (1 - expenseRatio / 100);
   const netAnnualIncome = netMonthlyIncome * 12;
   const calcRentalMAO = capRate > 0 ? netAnnualIncome / (capRate / 100) : 0;
-  const calcMAO = dealMode === "flip" ? calcFlipMAO : calcRentalMAO;
+  const flipProfit = arv - calcFlipMAO - rehabCost;
+  const flipProfitPct = (calcFlipMAO + rehabCost) > 0 ? (flipProfit / (calcFlipMAO + rehabCost)) * 100 : 0;
+  const netProfitPct = calcRentalMAO > 0 ? (netAnnualIncome / calcRentalMAO) * 100 : 0;
+
+  // Jerry calcs
+  const jerrySources = [zillow, realtorCom, redfin, source4].filter(v => v > 0);
+  const jerryASIS = jerrySources.length > 0 ? jerrySources.reduce((a, b) => a + b, 0) / jerrySources.length : 0;
+  const jerryTier = getJerryTier(jerryASIS);
+  const jerryExit = jerryASIS * jerryTier.exitPct;
+  const jerryFee = wholesaleFeeOverride !== "" ? Number(wholesaleFeeOverride) : jerryTier.defaultFee;
+  const jerryBuyPrice = jerryExit - jerryFee;
+  const jerryOfferPrice = jerryBuyPrice * jerryTier.offerPct;
+
+  const calcMAO = dealMode === "flip" ? calcFlipMAO : dealMode === "rental" ? calcRentalMAO : jerryBuyPrice;
   const finalMAO = maoOverride !== "" ? Number(maoOverride) : calcMAO;
 
-  const flipProfit = arv - finalMAO - rehabCost;
-  const flipProfitPct = (finalMAO + rehabCost) > 0 ? (flipProfit / (finalMAO + rehabCost)) * 100 : 0;
-  const netProfitPct = finalMAO > 0 ? (netAnnualIncome / finalMAO) * 100 : 0;
-
   const accentColor = "#f59e0b";
+  const jerryColor = "#00e5ff";
 
   // Preview MAO shown in collapsed header
-  const previewMAO = contact.maoOverride != null
-    ? contact.maoOverride
-    : contact.dealMode === "rental"
-      ? (contact.monthlyRent ?? 0) * 12 * (1 - (contact.expenseRatio ?? 40) / 100) / ((contact.capRate ?? 8) / 100)
-      : (contact.arv ?? 0) * ((contact.flipFactor ?? 70) / 100) - (contact.rehabCost ?? 0);
+  const previewMAO = (() => {
+    if (contact.maoOverride != null) return contact.maoOverride;
+    if (contact.dealMode === "rental") {
+      return (contact.monthlyRent ?? 0) * 12 * (1 - (contact.expenseRatio ?? 40) / 100) / ((contact.capRate ?? 8) / 100);
+    }
+    if (contact.dealMode === "jerry") {
+      const sources = [contact.zillow ?? 0, contact.realtorCom ?? 0, contact.redfin ?? 0, contact.source4 ?? 0].filter(v => v > 0);
+      if (!sources.length) return 0;
+      const asis = sources.reduce((a, b) => a + b, 0) / sources.length;
+      const tier = getJerryTier(asis);
+      return asis * tier.exitPct - (contact.wholesaleFeeOverride ?? tier.defaultFee);
+    }
+    return (contact.arv ?? 0) * ((contact.flipFactor ?? 70) / 100) - (contact.rehabCost ?? 0);
+  })();
+
+  const hasPreview = contact.dealMode === "jerry"
+    ? (contact.zillow || contact.realtorCom || contact.redfin || contact.maoOverride)
+    : (contact.arv || contact.maoOverride);
 
   async function handleSave() {
     setSaving(true);
     await onSave(contact.id, {
+      dealMode,
       arv,
       rehabCost,
       monthlyRent,
-      dealMode,
       flipFactor,
       capRate,
       expenseRatio,
       maoOverride: maoOverride !== "" ? Number(maoOverride) : null,
+      zillow: zillow || undefined,
+      realtorCom: realtorCom || undefined,
+      redfin: redfin || undefined,
+      source4: source4 || undefined,
+      wholesaleFeeOverride: wholesaleFeeOverride !== "" ? Number(wholesaleFeeOverride) : null,
     });
     setSaving(false);
     setSaved(true);
@@ -842,6 +893,15 @@ function MAOSection({ contact, onSave }: {
     outline: "none", boxSizing: "border-box",
   };
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase",
+    letterSpacing: "0.05em", display: "block", marginBottom: 4,
+  };
+
+  const rowStyle: React.CSSProperties = {
+    display: "flex", justifyContent: "space-between", marginBottom: 5,
+  };
+
   return (
     <div style={{ background: "#141414", borderRadius: 12, marginBottom: 14, border: `1px solid ${accentColor}33`, overflow: "hidden" }}>
       <button
@@ -850,9 +910,9 @@ function MAOSection({ contact, onSave }: {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            💰 MAO Calculator
+            MAO Calculator
           </span>
-          {(contact.arv || contact.maoOverride) ? (
+          {hasPreview ? (
             <span style={{ background: `${accentColor}22`, color: accentColor, border: `1px solid ${accentColor}44`, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
               {formatCurrency(previewMAO)}
             </span>
@@ -863,125 +923,190 @@ function MAOSection({ contact, onSave }: {
 
       {open && (
         <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${accentColor}22` }}>
+
           {/* Mode Toggle */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-            {(["flip", "rental"] as const).map((mode) => (
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {(["jerry", "flip", "rental"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setDealMode(mode)}
                 style={{
-                  padding: "5px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                  padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700,
                   cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                  background: dealMode === mode ? accentColor : "transparent",
-                  color: dealMode === mode ? "#000" : "#888",
-                  borderColor: dealMode === mode ? accentColor : "#333",
+                  background: dealMode === mode ? (mode === "jerry" ? jerryColor : accentColor) : "transparent",
+                  color: dealMode === mode ? "#000" : "#666",
+                  borderColor: dealMode === mode ? (mode === "jerry" ? jerryColor : accentColor) : "#2a2a2a",
                 }}
               >
-                {mode === "flip" ? "🔨 Flip" : "🏠 Rental"}
+                {mode === "jerry" ? "Jerry's Method" : mode === "flip" ? "Flip" : "Rental"}
               </button>
             ))}
           </div>
 
-          {/* Inputs */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Est. ARV ($)</label>
-              <input type="number" value={arv || ""} onChange={(e) => setArv(Number(e.target.value))} placeholder="250000" style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Rehab Cost ($)</label>
-              <input type="number" value={rehabCost || ""} onChange={(e) => setRehabCost(Number(e.target.value))} placeholder="30000" style={inputStyle} />
-            </div>
-            {dealMode === "rental" && (
-              <div>
-                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Monthly Rent ($)</label>
-                <input type="number" value={monthlyRent || ""} onChange={(e) => setMonthlyRent(Number(e.target.value))} placeholder="1500" style={inputStyle} />
+          {/* ── JERRY MODE ── */}
+          {dealMode === "jerry" && (
+            <>
+              {/* ASIS Inputs */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                {[
+                  { label: "Zillow", val: zillow, set: setZillow },
+                  { label: "Realtor.com", val: realtorCom, set: setRealtorCom },
+                  { label: "Redfin", val: redfin, set: setRedfin },
+                  { label: "Other (optional)", val: source4, set: setSource4 },
+                ].map(({ label, val, set }) => (
+                  <div key={label}>
+                    <label style={labelStyle}>{label}</label>
+                    <input
+                      type="number"
+                      value={val || ""}
+                      onChange={(e) => set(Number(e.target.value))}
+                      placeholder="0"
+                      style={inputStyle}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
 
-          {/* Flip Factor Slider */}
+              {/* ASIS Average + Tier */}
+              {jerryASIS > 0 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "8px 12px", background: "#0d0d0d", borderRadius: 8, border: "1px solid #222" }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>ASIS Average</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginTop: 2 }}>{formatCurrency(jerryASIS)}</div>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: `${jerryColor}18`, color: jerryColor, border: `1px solid ${jerryColor}33`, borderRadius: 20, padding: "3px 10px" }}>
+                    {jerryTier.label}
+                  </span>
+                </div>
+              )}
+
+              {/* Breakdown */}
+              {jerryASIS > 0 && (
+                <div style={{ background: "#0d0d0d", borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${jerryColor}22` }}>
+                  <div style={rowStyle}>
+                    <span style={{ fontSize: 12, color: "#555" }}>ASIS × {Math.round(jerryTier.exitPct * 100)}%</span>
+                    <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{formatCurrency(jerryExit)}</span>
+                  </div>
+                  <div style={{ ...rowStyle, paddingBottom: 8, marginBottom: 8, borderBottom: "1px solid #1e1e1e" }}>
+                    <span style={{ fontSize: 12, color: "#555" }}>− Wholesale Fee</span>
+                    <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>−{formatCurrency(jerryFee)}</span>
+                  </div>
+                  <div style={rowStyle}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Buy Price (MAO)</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(jerryBuyPrice)}</span>
+                  </div>
+                  <div style={{ ...rowStyle, marginTop: 8, paddingTop: 8, borderTop: "1px solid #1e1e1e", marginBottom: 0 }}>
+                    <span style={{ fontSize: 12, color: "#555" }}>× {Math.round(jerryTier.offerPct * 100)}% → Starting Offer</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: jerryColor }}>{formatCurrency(jerryOfferPrice)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Wholesale Fee Override */}
+              <div style={{ marginBottom: 10 }}>
+                <label style={labelStyle}>Wholesale Fee Override (optional)</label>
+                <input
+                  type="number"
+                  value={wholesaleFeeOverride}
+                  onChange={(e) => setWholesaleFeeOverride(e.target.value)}
+                  placeholder={`Default: ${formatCurrency(jerryTier.defaultFee)}`}
+                  style={{ ...inputStyle, border: `1px solid ${wholesaleFeeOverride !== "" ? accentColor : "#333"}` }}
+                />
+              </div>
+            </>
+          )}
+
+          {/* ── FLIP MODE ── */}
           {dealMode === "flip" && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Rule of %</label>
-                <span style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{flipFactor}%</span>
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <div>
+                  <label style={labelStyle}>Est. ARV ($)</label>
+                  <input type="number" value={arv || ""} onChange={(e) => setArv(Number(e.target.value))} placeholder="250000" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Rehab Cost ($)</label>
+                  <input type="number" value={rehabCost || ""} onChange={(e) => setRehabCost(Number(e.target.value))} placeholder="30000" style={inputStyle} />
+                </div>
               </div>
-              <input type="range" min={50} max={85} step={1} value={flipFactor} onChange={(e) => setFlipFactor(Number(e.target.value))} style={{ width: "100%", accentColor }} />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555" }}>
-                <span>50%</span><span>85%</span>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Rule of %</label>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{flipFactor}%</span>
+                </div>
+                <input type="range" min={50} max={85} step={1} value={flipFactor} onChange={(e) => setFlipFactor(Number(e.target.value))} style={{ width: "100%", accentColor }} />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555" }}>
+                  <span>50%</span><span>85%</span>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Rental Rate Inputs */}
-          {dealMode === "rental" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div>
-                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Expense Ratio (%)</label>
-                <input type="number" min={0} max={100} value={expenseRatio} onChange={(e) => setExpenseRatio(Number(e.target.value))} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>Target Cap Rate (%)</label>
-                <input type="number" min={1} max={30} step={0.5} value={capRate} onChange={(e) => setCapRate(Number(e.target.value))} style={inputStyle} />
-              </div>
-            </div>
-          )}
-
-          {/* Results */}
-          <div style={{ background: "#0d0d0d", borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${accentColor}22` }}>
-            {dealMode === "flip" ? (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ background: "#0d0d0d", borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${accentColor}22` }}>
+                <div style={rowStyle}>
                   <span style={{ fontSize: 12, color: "#666" }}>ARV × {flipFactor}%</span>
                   <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{formatCurrency(arv * flipFactor / 100)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
+                <div style={{ ...rowStyle, marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
                   <span style={{ fontSize: 12, color: "#666" }}>− Rehab Cost</span>
                   <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>−{formatCurrency(rehabCost)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={rowStyle}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Calc. MAO</span>
                   <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(calcFlipMAO)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{ ...rowStyle, marginBottom: 0 }}>
                   <span style={{ fontSize: 11, color: "#555" }}>Est. Profit</span>
                   <span style={{ fontSize: 11, color: flipProfit >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
                     {formatCurrency(flipProfit)} ({flipProfitPct.toFixed(1)}% ROI)
                   </span>
                 </div>
-              </>
-            ) : (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              </div>
+            </>
+          )}
+
+          {/* ── RENTAL MODE ── */}
+          {dealMode === "rental" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <div>
+                  <label style={labelStyle}>Monthly Rent ($)</label>
+                  <input type="number" value={monthlyRent || ""} onChange={(e) => setMonthlyRent(Number(e.target.value))} placeholder="1500" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Expense Ratio (%)</label>
+                  <input type="number" min={0} max={100} value={expenseRatio} onChange={(e) => setExpenseRatio(Number(e.target.value))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Target Cap Rate (%)</label>
+                  <input type="number" min={1} max={30} step={0.5} value={capRate} onChange={(e) => setCapRate(Number(e.target.value))} style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ background: "#0d0d0d", borderRadius: 10, padding: "12px 14px", marginBottom: 12, border: `1px solid ${accentColor}22` }}>
+                <div style={rowStyle}>
                   <span style={{ fontSize: 12, color: "#666" }}>Monthly Rent</span>
                   <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{formatCurrency(monthlyRent)}/mo</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={rowStyle}>
                   <span style={{ fontSize: 12, color: "#666" }}>Net Monthly ({100 - expenseRatio}% kept)</span>
                   <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>{formatCurrency(netMonthlyIncome)}/mo</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
+                <div style={{ ...rowStyle, marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #222" }}>
                   <span style={{ fontSize: 12, color: "#666" }}>Net Annual</span>
                   <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>{formatCurrency(netAnnualIncome)}/yr</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={rowStyle}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Calc. MAO ({capRate}% cap)</span>
                   <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(calcRentalMAO)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{ ...rowStyle, marginBottom: 0 }}>
                   <span style={{ fontSize: 11, color: "#555" }}>Net Annual Yield</span>
                   <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>{netProfitPct.toFixed(1)}%</span>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
 
           {/* MAO Override */}
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 10, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4 }}>
-              MAO Override (optional)
-            </label>
+            <label style={labelStyle}>MAO Override (optional)</label>
             <input
               type="number"
               value={maoOverride}

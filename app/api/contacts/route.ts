@@ -65,6 +65,11 @@ export async function PATCH(req: NextRequest) {
   if (properties.capRate !== undefined) notionProps["Cap Rate"] = { number: properties.capRate };
   if (properties.expenseRatio !== undefined) notionProps["Expense Ratio"] = { number: properties.expenseRatio };
   if (properties.maoOverride !== undefined) notionProps["MAO Override"] = properties.maoOverride !== null ? { number: properties.maoOverride } : { number: null };
+  if (properties.zillow !== undefined) notionProps["Zillow"] = properties.zillow !== null ? { number: properties.zillow } : { number: null };
+  if (properties.realtorCom !== undefined) notionProps["Realtor Com"] = properties.realtorCom !== null ? { number: properties.realtorCom } : { number: null };
+  if (properties.redfin !== undefined) notionProps["Redfin"] = properties.redfin !== null ? { number: properties.redfin } : { number: null };
+  if (properties.source4 !== undefined) notionProps["Source 4"] = properties.source4 !== null ? { number: properties.source4 } : { number: null };
+  if (properties.wholesaleFeeOverride !== undefined) notionProps["Wholesale Fee Override"] = properties.wholesaleFeeOverride !== null ? { number: properties.wholesaleFeeOverride } : { number: null };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });

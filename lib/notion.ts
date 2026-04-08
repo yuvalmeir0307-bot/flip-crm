@@ -298,5 +298,10 @@ export function extractContactProps(page: Record<string, unknown>) {
     capRate: props["Cap Rate"]?.number ?? undefined,
     expenseRatio: props["Expense Ratio"]?.number ?? undefined,
     maoOverride: props["MAO Override"]?.number ?? null,
+    zillow: props["Zillow"]?.number ?? undefined,
+    realtorCom: props["Realtor Com"]?.number ?? undefined,
+    redfin: props["Redfin"]?.number ?? undefined,
+    source4: props["Source 4"]?.number ?? undefined,
+    wholesaleFeeOverride: props["Wholesale Fee Override"]?.number ?? null,
   };
 }
