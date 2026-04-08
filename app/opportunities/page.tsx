@@ -411,10 +411,10 @@ type Contact = {
   capRate?: number;
   expenseRatio?: number;
   maoOverride?: number | null;
-  zillow?: number;
-  realtorCom?: number;
-  redfin?: number;
-  source4?: number;
+  zillow?: number | null;
+  realtorCom?: number | null;
+  redfin?: number | null;
+  source4?: number | null;
   wholesaleFeeOverride?: number | null;
 };
 
@@ -839,7 +839,7 @@ function MAOSection({ contact, onSave }: {
   const jerryBuyPrice = jerryExit - jerryFee;
   const jerryOfferPrice = jerryBuyPrice * jerryTier.offerPct;
 
-  const calcMAO = dealMode === "flip" ? calcFlipMAO : dealMode === "rental" ? calcRentalMAO : jerryBuyPrice;
+  const calcMAO = dealMode === "flip" ? calcFlipMAO : dealMode === "rental" ? calcRentalMAO : (jerryASIS > 0 ? jerryBuyPrice : 0);
   const finalMAO = maoOverride !== "" ? Number(maoOverride) : calcMAO;
 
   const accentColor = "#f59e0b";
@@ -876,10 +876,10 @@ function MAOSection({ contact, onSave }: {
       capRate,
       expenseRatio,
       maoOverride: maoOverride !== "" ? Number(maoOverride) : null,
-      zillow: zillow || undefined,
-      realtorCom: realtorCom || undefined,
-      redfin: redfin || undefined,
-      source4: source4 || undefined,
+      zillow: zillow,
+      realtorCom: realtorCom,
+      redfin: redfin,
+      source4: source4,
       wholesaleFeeOverride: wholesaleFeeOverride !== "" ? Number(wholesaleFeeOverride) : null,
     });
     setSaving(false);

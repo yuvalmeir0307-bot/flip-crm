@@ -14,9 +14,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const page = await createContact(body);
-  return NextResponse.json({ ok: true, id: (page as { id: string }).id });
+  try {
+    const body = await req.json();
+    const page = await createContact(body);
+    return NextResponse.json({ ok: true, id: (page as { id: string }).id });
+  } catch (e: unknown) {
+    console.error("Contacts POST error:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {
@@ -65,10 +71,10 @@ export async function PATCH(req: NextRequest) {
   if (properties.capRate !== undefined) notionProps["Cap Rate"] = { number: properties.capRate };
   if (properties.expenseRatio !== undefined) notionProps["Expense Ratio"] = { number: properties.expenseRatio };
   if (properties.maoOverride !== undefined) notionProps["MAO Override"] = properties.maoOverride !== null ? { number: properties.maoOverride } : { number: null };
-  if (properties.zillow !== undefined) notionProps["Zillow"] = properties.zillow !== null ? { number: properties.zillow } : { number: null };
-  if (properties.realtorCom !== undefined) notionProps["Realtor Com"] = properties.realtorCom !== null ? { number: properties.realtorCom } : { number: null };
-  if (properties.redfin !== undefined) notionProps["Redfin"] = properties.redfin !== null ? { number: properties.redfin } : { number: null };
-  if (properties.source4 !== undefined) notionProps["Source 4"] = properties.source4 !== null ? { number: properties.source4 } : { number: null };
+  if (properties.zillow !== undefined) notionProps["Zillow"] = { number: properties.zillow ?? null };
+  if (properties.realtorCom !== undefined) notionProps["Realtor Com"] = { number: properties.realtorCom ?? null };
+  if (properties.redfin !== undefined) notionProps["Redfin"] = { number: properties.redfin ?? null };
+  if (properties.source4 !== undefined) notionProps["Source 4"] = { number: properties.source4 ?? null };
   if (properties.wholesaleFeeOverride !== undefined) notionProps["Wholesale Fee Override"] = properties.wholesaleFeeOverride !== null ? { number: properties.wholesaleFeeOverride } : { number: null };
 
   await updateContact(id, notionProps);
