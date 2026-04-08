@@ -89,6 +89,9 @@ export default function SettingsPage() {
   const [qaLogs, setQaLogs] = useState<QALog[]>([]);
   const [qaLoading, setQaLoading] = useState(false);
   const [expandedQaRun, setExpandedQaRun] = useState<string | null>(null);
+  const [qaRunning, setQaRunning] = useState(false);
+  const [qaRunStep, setQaRunStep] = useState("");
+  const [qaLiveResult, setQaLiveResult] = useState<QAData | null>(null);
   const [alerts, setAlerts] = useState<LogEntry[]>([]);
   const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -118,6 +121,30 @@ export default function SettingsPage() {
       if (Array.isArray(data)) setQaLogs(data);
     } catch { /* silent */ }
     setQaLoading(false);
+  }
+
+  async function runQaNow() {
+    setQaRunning(true);
+    setQaLiveResult(null);
+    setQaRunStep("Checking pages...");
+    try {
+      setTimeout(() => setQaRunStep("Checking APIs..."), 3000);
+      setTimeout(() => setQaRunStep("Running regression tests..."), 7000);
+      setTimeout(() => setQaRunStep("Measuring performance..."), 11000);
+      setTimeout(() => setQaRunStep("Saving to Notion..."), 15000);
+      const res = await fetch("/api/qa-run", {
+        method: "POST",
+        headers: { "x-qa-secret": "flip123secret" },
+      });
+      const data = await res.json();
+      if (data.overall) {
+        setQaLiveResult(data as QAData);
+        // Reload history
+        await loadQaLogs();
+      }
+    } catch { /* silent */ }
+    setQaRunning(false);
+    setQaRunStep("");
   }
 
   async function loadContacts() {
@@ -262,12 +289,67 @@ export default function SettingsPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
                   <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e5e5e5", margin: 0 }}>QA Agent</h2>
-                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>Runs at 8:00 AM and 8:00 PM every day · Checks health, files, performance, and logic</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>Runs at 8:00 AM and 8:00 PM every day · Checks health, performance, and logic</p>
                 </div>
-                <button onClick={loadQaLogs} style={{ background: "transparent", border: "1px solid #333", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#6b7280", cursor: "pointer" }}>
-                  Refresh
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={loadQaLogs} disabled={qaRunning} style={{ background: "transparent", border: "1px solid #333", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#6b7280", cursor: "pointer" }}>
+                    Refresh
+                  </button>
+                  <button
+                    onClick={runQaNow}
+                    disabled={qaRunning}
+                    style={{
+                      background: qaRunning ? "#141414" : "#00e5ff",
+                      color: qaRunning ? "#6b7280" : "#000",
+                      border: `1px solid ${qaRunning ? "#333" : "#00e5ff"}`,
+                      borderRadius: 8, padding: "6px 18px", fontSize: 12, fontWeight: 700,
+                      cursor: qaRunning ? "not-allowed" : "pointer",
+                      transition: "all 0.2s",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    {qaRunning ? (
+                      <>
+                        <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", border: "2px solid #6b7280", borderTopColor: "#00e5ff", animation: "spin 0.8s linear infinite" }} />
+                        {qaRunStep || "Running..."}
+                      </>
+                    ) : "▶ Run Now"}
+                  </button>
+                </div>
               </div>
+
+              {/* ── Live Result (after manual run) ── */}
+              {qaLiveResult && !qaRunning && (
+                <div style={{
+                  background: qaLiveResult.overall === "PASS" ? "#052e16" : "#1c0a0a",
+                  border: `1px solid ${qaLiveResult.overall === "PASS" ? "#16a34a44" : "#dc262644"}`,
+                  borderRadius: 12, padding: "16px 20px", marginBottom: 16,
+                  display: "flex", alignItems: "center", gap: 14,
+                }}>
+                  <span style={{ fontSize: 22 }}>{qaLiveResult.overall === "PASS" ? "✅" : "❌"}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: qaLiveResult.overall === "PASS" ? "#22c55e" : "#ef4444" }}>
+                      Manual run complete — {qaLiveResult.overall === "PASS" ? "All systems OK" : "Issues found"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                      {qaLiveResult.duration_s}s · {qaLiveResult.timestamp} · Saved to history
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["health", "performance", "regression"] as const).map(key => {
+                      const c = qaLiveResult.checks[key];
+                      return (
+                        <span key={key} style={{
+                          fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
+                          background: c.passed ? "#22c55e22" : "#ef444422",
+                          color: c.passed ? "#22c55e" : "#ef4444",
+                        }}>{key}</span>
+                      );
+                    })}
+                  </div>
+                  <button onClick={() => setQaLiveResult(null)} style={{ background: "transparent", border: "none", color: "#4b5563", fontSize: 16, cursor: "pointer" }}>×</button>
+                </div>
+              )}
 
               {qaLoading ? (
                 <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 24 }}>Loading...</p>

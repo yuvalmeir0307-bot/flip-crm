@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/admin/backfill-assignments",
   "/api/logs",
   "/api/qa-logs",
+  "/api/qa-run",
   "/api/setup-logs",
 ];
 
