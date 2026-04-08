@@ -461,12 +461,27 @@ export default function Dashboard() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {/* Replied to us */}
-                <div style={{
-                  background: "rgba(251,191,36,0.06)",
-                  border: "1px solid rgba(251,191,36,0.2)",
-                  borderRadius: 10, padding: "14px 16px",
-                }}>
+                {/* Replied to us — click to open OpenPhone */}
+                <a
+                  href="https://app.openphone.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "block", textDecoration: "none",
+                    background: "rgba(251,191,36,0.06)",
+                    border: "1px solid rgba(251,191,36,0.2)",
+                    borderRadius: 10, padding: "14px 16px",
+                    cursor: "pointer", transition: "border-color 0.15s, background 0.15s",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLAnchorElement).style.background = "rgba(251,191,36,0.12)";
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(251,191,36,0.45)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLAnchorElement).style.background = "rgba(251,191,36,0.06)";
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(251,191,36,0.2)";
+                  }}
+                >
                   <div style={{ fontSize: 10, color: "#92400e", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
                     Replied to Us
                   </div>
@@ -474,9 +489,9 @@ export default function Dashboard() {
                     {repliedToUs}
                   </div>
                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                    waiting in inbox
+                    waiting in inbox ↗
                   </div>
-                </div>
+                </a>
 
                 {/* We reached back */}
                 <div style={{
