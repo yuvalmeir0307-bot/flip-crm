@@ -55,7 +55,7 @@ function toE164(raw: string): string {
 /** Extract all US phone numbers from a text string */
 function extractPhones(text: string): string[] {
   const matches = text.match(/\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/g) ?? [];
-  return [...new Set(matches.map(toE164).filter((p) => p.length === 12))];
+  return Array.from(new Set(matches.map(toE164).filter((p) => p.length === 12)));
 }
 
 /** Decode HTML entities */
@@ -212,7 +212,7 @@ function extractProfileUrls(html: string): string[] {
       urls.push(url);
     }
   }
-  return [...new Set(urls)];
+  return Array.from(new Set(urls));
 }
 
 /**
