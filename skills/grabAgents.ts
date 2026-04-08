@@ -1,15 +1,14 @@
 /**
  * Skill: grabAgents
  *
- * Scrapes real estate agents from realtor.com using ScraperAPI (free tier:
- * 5,000 req/month) to bypass Vercel IP blocking. Extracts direct/mobile
- * phone numbers, verifies them against a second source (DuckDuckGo), checks
- * for duplicates by both phone AND name, then adds new agents to Notion.
+ * Pulls verified Milwaukee-area real estate agent contacts from Realtor.com
+ * with personal/direct phone numbers. Deduplicates by phone AND name against
+ * Notion, then inserts new agents as "Drip Active" contacts.
+ *
+ * No ScraperAPI required — fetches Realtor.com directly with browser headers.
  */
 
 import { findContactByPhone, findContactByName, createContact } from "@/lib/notion";
-
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY!;
 
 // Milwaukee + ~40-min drive radius
 const LOCATIONS = [
@@ -37,6 +36,17 @@ const LOCATIONS = [
 
 // Phone type priority: lower index = higher priority
 const PHONE_PRIORITY = ["mobile", "direct", "office"];
+
+const FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+};
 
 export interface GrabResult {
   added: string[];
@@ -69,15 +79,25 @@ function toE164(raw: string): string {
 }
 
 /** Sort phones by priority and return { primary, alts, isPersonal } */
-function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[]; isPersonal: boolean } {
+function pickBestPhone(phones: RawPhone[]): {
+  primary: string;
+  alts: string[];
+  isPersonal: boolean;
+} {
   const valid = phones
     .filter((p) => p.number && p.type !== "fax")
     .map((p) => ({ ...p, e164: toE164(p.number) }))
     .filter((p) => p.e164.length === 12);
 
   valid.sort((a, b) => {
-    const ai = PHONE_PRIORITY.indexOf(a.type) === -1 ? 99 : PHONE_PRIORITY.indexOf(a.type);
-    const bi = PHONE_PRIORITY.indexOf(b.type) === -1 ? 99 : PHONE_PRIORITY.indexOf(b.type);
+    const ai =
+      PHONE_PRIORITY.indexOf(a.type) === -1
+        ? 99
+        : PHONE_PRIORITY.indexOf(a.type);
+    const bi =
+      PHONE_PRIORITY.indexOf(b.type) === -1
+        ? 99
+        : PHONE_PRIORITY.indexOf(b.type);
     return ai - bi;
   });
 
@@ -85,52 +105,70 @@ function pickBestPhone(phones: RawPhone[]): { primary: string; alts: string[]; i
   const best = valid[0];
   const primary = best.e164;
   const isPersonal = best.type === "mobile" || best.type === "direct";
-  const alts = Array.from(new Set(valid.slice(1).map((p) => p.e164).filter((n) => n !== primary)));
+  const alts = Array.from(
+    new Set(
+      valid
+        .slice(1)
+        .map((p) => p.e164)
+        .filter((n) => n !== primary)
+    )
+  );
   return { primary, alts, isPersonal };
 }
 
 /**
  * Verify a phone number on a second source (DuckDuckGo HTML search).
- * Returns true if the last 7 digits of the number appear in search results
- * alongside the agent's name — confirming it's a real, known number.
+ * Returns true if the last 7 digits appear in search results alongside the agent's name.
  */
-async function verifyPhoneSecondSource(name: string, phone: string): Promise<boolean> {
+async function verifyPhoneSecondSource(
+  name: string,
+  phone: string
+): Promise<boolean> {
   try {
     const last7 = phone.replace(/\D/g, "").slice(-7);
     const query = encodeURIComponent(`"${name}" "${last7}" realtor Wisconsin`);
-    const res = await fetch(`https://html.duckduckgo.com/html/?q=${query}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html",
-      },
-    });
+    const res = await fetch(
+      `https://html.duckduckgo.com/html/?q=${query}`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "text/html",
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
     if (!res.ok) return false;
     const html = await res.text();
-    // Phone verified if last 7 digits appear in results (different source than Realtor.com)
     return html.includes(last7) && html.length > 1000;
   } catch {
     return false;
   }
 }
 
-/** Fetch one page of agents from realtor.com via ScraperAPI */
-async function fetchAgentsPage(locationSlug: string, page: number): Promise<{ agents: RawAgent[]; error?: string }> {
-  const targetUrl = page === 1
-    ? `https://www.realtor.com/realestateagents/${locationSlug}`
-    : `https://www.realtor.com/realestateagents/${locationSlug}/pg-${page}`;
-
-  const scraperUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=false`;
+/** Fetch one page of agents from realtor.com directly */
+async function fetchAgentsPage(
+  locationSlug: string,
+  page: number
+): Promise<{ agents: RawAgent[]; error?: string }> {
+  const targetUrl =
+    page === 1
+      ? `https://www.realtor.com/realestateagents/${locationSlug}`
+      : `https://www.realtor.com/realestateagents/${locationSlug}/pg-${page}`;
 
   try {
-    const res = await fetch(scraperUrl, {
-      headers: { "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+    const res = await fetch(targetUrl, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(15000),
     });
 
-    if (!res.ok) return { agents: [], error: `ScraperAPI HTTP ${res.status}` };
+    if (!res.ok) return { agents: [], error: `HTTP ${res.status}` };
 
     const html = await res.text();
 
-    const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    const match = html.match(
+      /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
+    );
     if (!match) return { agents: [], error: "No __NEXT_DATA__ found" };
 
     const data = JSON.parse(match[1]);
@@ -146,7 +184,10 @@ async function fetchAgentsPage(locationSlug: string, page: number): Promise<{ ag
 
     return { agents };
   } catch (e) {
-    return { agents: [], error: e instanceof Error ? e.message : String(e) };
+    return {
+      agents: [],
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 
@@ -164,11 +205,6 @@ export async function grabAndAddAgents(
   const errors: string[] = [];
   const unverified: string[] = [];
 
-  if (!SCRAPER_API_KEY) {
-    errors.push("SCRAPER_API_KEY env var is not set");
-    return { added, skipped, errors, unverified };
-  }
-
   // Shuffle locations for variety on each run
   const locations = [...LOCATIONS].sort(() => Math.random() - 0.5);
 
@@ -180,7 +216,7 @@ export async function grabAndAddAgents(
 
       if (error) {
         errors.push(`[${slug} p${page}] ${error}`);
-        if (error.startsWith("ScraperAPI HTTP")) break;
+        if (error.startsWith("HTTP 4") || error.startsWith("HTTP 5")) break;
         continue;
       }
 
@@ -196,18 +232,28 @@ export async function grabAndAddAgents(
         // Duplicate check by phone
         try {
           const existingByPhone = await findContactByPhone(primary);
-          if (existingByPhone) { skipped.push(`${raw.full_name} (phone duplicate)`); continue; }
-        } catch { /* ignore lookup failures */ }
+          if (existingByPhone) {
+            skipped.push(`${raw.full_name} (phone duplicate)`);
+            continue;
+          }
+        } catch {
+          /* ignore lookup failures */
+        }
 
         // Duplicate check by name
         try {
           const existingByName = await findContactByName(raw.full_name);
-          if (existingByName) { skipped.push(`${raw.full_name} (name duplicate)`); continue; }
-        } catch { /* ignore lookup failures */ }
+          if (existingByName) {
+            skipped.push(`${raw.full_name} (name duplicate)`);
+            continue;
+          }
+        } catch {
+          /* ignore lookup failures */
+        }
 
-        // Verify personal number on second source (DuckDuckGo)
+        // Verify personal number on second source
         // Mobile/direct from Realtor.com = self-reported personal number → verified
-        // Office-only → attempt second-source check
+        // Office-only → attempt second-source check via DuckDuckGo
         let verified = isPersonal;
         if (!isPersonal) {
           verified = await verifyPhoneSecondSource(raw.full_name, primary);
@@ -231,7 +277,9 @@ export async function grabAndAddAgents(
           added.push(raw.full_name);
           if (!verified) unverified.push(raw.full_name);
         } catch (e) {
-          errors.push(`${raw.full_name}: ${e instanceof Error ? e.message : "Unknown error"}`);
+          errors.push(
+            `${raw.full_name}: ${e instanceof Error ? e.message : "Unknown error"}`
+          );
         }
       }
     }
