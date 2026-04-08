@@ -11,12 +11,12 @@ import {
 import { getAllScripts, resolveMessage, ScriptEntry } from "@/lib/scripts";
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
   const secret = process.env.CRON_SECRET || "flip123secret";
-  const isAuthorized = authHeader === `Bearer ${secret}`;
+  // Only allow: Vercel cron scheduler OR internal call from /api/run-drip (uses x-internal-drip header)
+  const isInternalProxy = req.headers.get("x-internal-drip") === secret;
 
-  if (process.env.NODE_ENV === "production" && !isVercelCron && !isAuthorized) {
+  if (process.env.NODE_ENV === "production" && !isVercelCron && !isInternalProxy) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
