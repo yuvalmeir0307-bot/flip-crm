@@ -3,36 +3,18 @@
  *
  * Uses Gemini 2.0 Flash with Google Search grounding to discover verified
  * Milwaukee-area real estate agent contacts with personal/direct phone numbers.
- * Deduplicates by phone AND name against Notion, then inserts new agents as
- * "Drip Active" contacts.
- *
- * No ScraperAPI. No paid proxies. Uses GEMINI_GRAB_KEY for search grounding.
+ * Makes a minimal number of API calls (1-2 per run) to avoid rate limits.
+ * Deduplicates by phone AND name against Notion, then inserts "Drip Active".
  */
 
 import { findContactByPhone, findContactByName, createContact } from "@/lib/notion";
 
-// Milwaukee + ~40-min drive radius — rotated per run
-const LOCATIONS = [
-  "Milwaukee, WI",
-  "Wauwatosa, WI",
-  "West Allis, WI",
-  "Brookfield, WI",
-  "Waukesha, WI",
-  "Menomonee Falls, WI",
-  "New Berlin, WI",
-  "Mequon, WI",
-  "Oak Creek, WI",
-  "Shorewood, WI",
-  "Greenfield, WI",
-  "Franklin, WI",
-  "Glendale, WI",
-  "Racine, WI",
-  "Grafton, WI",
-  "Germantown, WI",
-  "Hartland, WI",
-  "Pewaukee, WI",
-  "Oconomowoc, WI",
-  "Sussex, WI",
+// Rotation pools — pick a different subset each run for variety
+const CITY_POOLS = [
+  "Milwaukee, Wauwatosa, West Allis, Brookfield, Waukesha",
+  "Menomonee Falls, Mequon, Oak Creek, Shorewood, Greenfield",
+  "Franklin, Glendale, Racine, Grafton, Germantown",
+  "Hartland, Pewaukee, Oconomowoc, Sussex, New Berlin",
 ];
 
 export interface GrabResult {
@@ -47,7 +29,6 @@ interface GeminiAgent {
   phone: string;
   brokerage: string;
   area: string;
-  verified: boolean;
 }
 
 /** Normalize any US phone string to E.164 (+1XXXXXXXXXX) */
@@ -61,26 +42,35 @@ function toE164(raw: string): string {
 }
 
 /**
- * Use Gemini 2.0 Flash with Google Search grounding to discover agents
- * in a specific city. Returns structured agent data with phone numbers.
+ * One Gemini call with Google Search grounding to find N agents across
+ * a set of Milwaukee-area cities.
  */
 async function fetchAgentsViaGemini(
-  city: string,
-  count: number
+  cities: string,
+  count: number,
+  attempt: number
 ): Promise<{ agents: GeminiAgent[]; error?: string }> {
-  const apiKey = process.env.GEMINI_GRAB_KEY;
-  if (!apiKey) return { agents: [], error: "GEMINI_GRAB_KEY not set" };
+  const apiKey = process.env.GEMINI_GRAB_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) return { agents: [], error: "No Gemini API key set" };
 
-  const prompt = `Search for ${count * 3} real estate agents currently active in ${city}.
-Use realtor.com, zillow.com, and google to find agents with their contact info.
+  // Vary the search angle on retry to get different results
+  const searchAngle =
+    attempt === 1
+      ? "Find real estate agents on realtor.com and zillow.com"
+      : "Search Google for real estate agent profiles with phone numbers";
 
-For each agent return their full name, direct/mobile phone number, and brokerage.
-IMPORTANT: Only include agents that have a direct or mobile phone number (not just an office number).
+  const prompt = `${searchAngle} in these Wisconsin cities: ${cities}.
 
-Return ONLY a valid JSON array, no other text:
-[{"name":"Jane Smith","phone":"4141234567","brokerage":"Keller Williams Milwaukee"}]
+Find exactly ${count * 2} active real estate agents with direct or mobile phone numbers.
+Use web search to find their contact info from public listings.
 
-Focus on finding personal/direct phone numbers. Skip any agent without a clear phone number.`;
+Return ONLY a JSON array (no markdown, no explanation):
+[{"name":"Full Name","phone":"4141234567","brokerage":"Brokerage Name","city":"City, WI"}]
+
+Rules:
+- phone must be a 10-digit US number (no dashes, no parentheses)
+- Include only agents with a personal direct or mobile number
+- Do not include agents with only office/brokerage main line numbers`;
 
   try {
     const res = await fetch(
@@ -91,28 +81,36 @@ Focus on finding personal/direct phone numbers. Skip any agent without a clear p
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
         }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(55000),
       }
     );
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      return { agents: [], error: `Gemini HTTP ${res.status}: ${errText.slice(0, 120)}` };
+      return {
+        agents: [],
+        error: `Gemini ${res.status}: ${errText.slice(0, 120)}`,
+      };
     }
 
     const data = await res.json();
-    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text: string =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    // Extract JSON array from response (may be wrapped in markdown code block)
-    const jsonMatch = text.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) return { agents: [], error: `No JSON in response: ${text.slice(0, 80)}` };
+    // Strip markdown code fences if present
+    const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const jsonMatch = clean.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) {
+      return { agents: [], error: `No JSON array in response: ${text.slice(0, 100)}` };
+    }
 
     const raw = JSON.parse(jsonMatch[0]) as Array<{
       name?: string;
       phone?: string;
       brokerage?: string;
+      city?: string;
     }>;
 
     const agents: GeminiAgent[] = raw
@@ -121,8 +119,7 @@ Focus on finding personal/direct phone numbers. Skip any agent without a clear p
         name: String(a.name ?? "").trim(),
         phone: toE164(String(a.phone ?? "")),
         brokerage: String(a.brokerage ?? "").trim(),
-        area: city,
-        verified: true, // Gemini sourced from public directories = verified
+        area: String(a.city ?? cities.split(",")[0]).trim(),
       }))
       .filter((a) => a.phone.length === 12 && a.name.length > 2);
 
@@ -137,8 +134,8 @@ Focus on finding personal/direct phone numbers. Skip any agent without a clear p
 
 /**
  * Main entry point.
- * Pulls `count` new agents (not already in Notion) for the given assignee.
- * Uses Gemini search grounding for discovery, checks duplicates by phone AND name.
+ * Pulls exactly `count` new agents for the given assignee.
+ * Makes at most 2 Gemini calls to avoid rate limits.
  */
 export async function grabAndAddAgents(
   assignedTo: "Yahav" | "Yuval",
@@ -149,17 +146,15 @@ export async function grabAndAddAgents(
   const errors: string[] = [];
   const unverified: string[] = [];
 
-  // Shuffle locations for variety on each run
-  const locations = [...LOCATIONS].sort(() => Math.random() - 0.5);
+  // Pick a random city pool for variety
+  const cityPool = CITY_POOLS[Math.floor(Math.random() * CITY_POOLS.length)];
 
-  for (const city of locations) {
-    if (added.length >= count) break;
-
+  for (let attempt = 1; attempt <= 2 && added.length < count; attempt++) {
     const needed = count - added.length;
-    const { agents, error } = await fetchAgentsViaGemini(city, needed + 2);
+    const { agents, error } = await fetchAgentsViaGemini(cityPool, needed, attempt);
 
     if (error) {
-      errors.push(`[${city}] ${error}`);
+      errors.push(error);
       continue;
     }
 
@@ -174,7 +169,7 @@ export async function grabAndAddAgents(
           continue;
         }
       } catch {
-        /* ignore lookup failures */
+        /* ignore */
       }
 
       // Duplicate check by name
@@ -185,7 +180,7 @@ export async function grabAndAddAgents(
           continue;
         }
       } catch {
-        /* ignore lookup failures */
+        /* ignore */
       }
 
       try {
@@ -199,10 +194,9 @@ export async function grabAndAddAgents(
           status: "Drip Active",
           altPhones: "",
           assignedTo,
-          verified: agent.verified,
+          verified: true,
         });
         added.push(agent.name);
-        if (!agent.verified) unverified.push(agent.name);
       } catch (e) {
         errors.push(
           `${agent.name}: ${e instanceof Error ? e.message : "Unknown error"}`
