@@ -416,6 +416,7 @@ type Contact = {
   redfin?: number | null;
   source4?: number | null;
   wholesaleFeeOverride?: number | null;
+  propertyAddress?: string;
 };
 
 const WARMTH_OPTIONS = ["Cold", "Warm", "Hot"];
@@ -811,6 +812,9 @@ function MAOSection({ contact, onSave }: {
   const [expenseRatio, setExpenseRatio] = useState(contact.expenseRatio ?? 40);
   const [maoOverride, setMaoOverride] = useState<string>(contact.maoOverride != null ? String(contact.maoOverride) : "");
   // Jerry mode state
+  const [propertyAddress, setPropertyAddress] = useState(contact.propertyAddress ?? "");
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
   const [zillow, setZillow] = useState(contact.zillow ?? 0);
   const [realtorCom, setRealtorCom] = useState(contact.realtorCom ?? 0);
   const [redfin, setRedfin] = useState(contact.redfin ?? 0);
@@ -820,6 +824,26 @@ function MAOSection({ contact, onSave }: {
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Auto-fetch estimates when address changes (debounced 1.5s)
+  useEffect(() => {
+    const addr = propertyAddress.trim();
+    if (addr.length < 8) { setFetchError(""); return; }
+    const t = setTimeout(async () => {
+      setFetching(true);
+      setFetchError("");
+      try {
+        const res = await fetch(`/api/property-estimate?address=${encodeURIComponent(addr)}`);
+        const data = await res.json();
+        if (data.zillow)     setZillow(Math.round(data.zillow));
+        if (data.redfin)     setRedfin(Math.round(data.redfin));
+        if (data.realtorCom) setRealtorCom(Math.round(data.realtorCom));
+        if (!data.zillow && !data.redfin && !data.realtorCom) setFetchError("No estimates found — enter values manually");
+      } catch { setFetchError("Fetch failed — enter values manually"); }
+      setFetching(false);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [propertyAddress]);
 
   // Flip / Rental calcs
   const calcFlipMAO = arv * (flipFactor / 100) - rehabCost;
@@ -833,10 +857,10 @@ function MAOSection({ contact, onSave }: {
   // Jerry calcs
   const jerrySources = [zillow, realtorCom, redfin, source4].filter(v => v > 0);
   const jerryASIS = jerrySources.length > 0 ? jerrySources.reduce((a, b) => a + b, 0) / jerrySources.length : 0;
-  const jerryTier = getJerryTier(jerryASIS);
+  const jerryTier = getJerryTier(Math.max(jerryASIS, 1));
   const jerryExit = jerryASIS * jerryTier.exitPct;
   const jerryFee = wholesaleFeeOverride !== "" ? Number(wholesaleFeeOverride) : jerryTier.defaultFee;
-  const jerryBuyPrice = jerryExit - jerryFee;
+  const jerryBuyPrice = Math.max(0, jerryExit - jerryFee);
   const jerryOfferPrice = jerryBuyPrice * jerryTier.offerPct;
 
   const calcMAO = dealMode === "flip" ? calcFlipMAO : dealMode === "rental" ? calcRentalMAO : (jerryASIS > 0 ? jerryBuyPrice : 0);
@@ -862,7 +886,7 @@ function MAOSection({ contact, onSave }: {
   })();
 
   const hasPreview = contact.dealMode === "jerry"
-    ? (contact.zillow || contact.realtorCom || contact.redfin || contact.maoOverride)
+    ? (contact.zillow || contact.realtorCom || contact.redfin || contact.source4 || contact.maoOverride)
     : (contact.arv || contact.maoOverride);
 
   async function handleSave() {
@@ -876,11 +900,12 @@ function MAOSection({ contact, onSave }: {
       capRate,
       expenseRatio,
       maoOverride: maoOverride !== "" ? Number(maoOverride) : null,
-      zillow: zillow,
-      realtorCom: realtorCom,
-      redfin: redfin,
-      source4: source4,
+      zillow,
+      realtorCom,
+      redfin,
+      source4,
       wholesaleFeeOverride: wholesaleFeeOverride !== "" ? Number(wholesaleFeeOverride) : null,
+      propertyAddress: propertyAddress || undefined,
     });
     setSaving(false);
     setSaved(true);
@@ -910,7 +935,7 @@ function MAOSection({ contact, onSave }: {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            MAO Calculator
+            Offer Calculator
           </span>
           {hasPreview ? (
             <span style={{ background: `${accentColor}22`, color: accentColor, border: `1px solid ${accentColor}44`, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
@@ -946,6 +971,29 @@ function MAOSection({ contact, onSave }: {
           {/* ── JERRY MODE ── */}
           {dealMode === "jerry" && (
             <>
+              {/* Address Auto-Fetch */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>Property Address</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    value={propertyAddress}
+                    onChange={(e) => setPropertyAddress(e.target.value)}
+                    placeholder="123 Main St, City, State"
+                    style={{ ...inputStyle, paddingRight: 32 }}
+                  />
+                  {fetching && (
+                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: jerryColor }}>⟳</span>
+                  )}
+                </div>
+                {fetching && (
+                  <div style={{ fontSize: 10, color: jerryColor, marginTop: 4 }}>Fetching estimates from Zillow & Redfin…</div>
+                )}
+                {fetchError && !fetching && (
+                  <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>{fetchError}</div>
+                )}
+              </div>
+
               {/* ASIS Inputs */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
                 {[
@@ -996,7 +1044,7 @@ function MAOSection({ contact, onSave }: {
                     <span style={{ fontSize: 14, fontWeight: 800, color: accentColor }}>{formatCurrency(jerryBuyPrice)}</span>
                   </div>
                   <div style={{ ...rowStyle, marginTop: 8, paddingTop: 8, borderTop: "1px solid #1e1e1e", marginBottom: 0 }}>
-                    <span style={{ fontSize: 12, color: "#555" }}>× {Math.round(jerryTier.offerPct * 100)}% → Starting Offer</span>
+                    <span style={{ fontSize: 12, color: "#555" }}>× {Math.round(jerryTier.offerPct * 100)}% → Offer Price (Anchor)</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: jerryColor }}>{formatCurrency(jerryOfferPrice)}</span>
                   </div>
                 </div>

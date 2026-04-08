@@ -76,6 +76,7 @@ export async function PATCH(req: NextRequest) {
   if (properties.redfin !== undefined) notionProps["Redfin"] = { number: properties.redfin ?? null };
   if (properties.source4 !== undefined) notionProps["Source 4"] = { number: properties.source4 ?? null };
   if (properties.wholesaleFeeOverride !== undefined) notionProps["Wholesale Fee Override"] = properties.wholesaleFeeOverride !== null ? { number: properties.wholesaleFeeOverride } : { number: null };
+  if (properties.propertyAddress !== undefined) notionProps["Property Address"] = { rich_text: [{ text: { content: properties.propertyAddress ?? "" } }] };
 
   await updateContact(id, notionProps);
   return NextResponse.json({ ok: true });

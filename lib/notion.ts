@@ -303,5 +303,6 @@ export function extractContactProps(page: Record<string, unknown>) {
     redfin: props["Redfin"]?.number ?? null,
     source4: props["Source 4"]?.number ?? null,
     wholesaleFeeOverride: props["Wholesale Fee Override"]?.number ?? null,
+    propertyAddress: props["Property Address"]?.rich_text?.[0]?.plain_text ?? undefined,
   };
 }
