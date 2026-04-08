@@ -122,8 +122,8 @@ export async function POST(req: Request) {
 
   await createRunLog({
     date: new Date().toISOString(),
-    type: "QA",
-    contactName: "QA Agent",
+    type: "Drip",           // Notion Type field only accepts Drip/Pool
+    contactName: `QA — ${overall}`,
     phone: "system",
     step: overall,
     status: overall === "PASS" ? "success" : "failed",
