@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 // Fetch Zillow home details HTML and extract zestimate
-async function getZestimateFromHtml(zpid: number): Promise<number | null> {
+// Also returns debug info when requested
+async function getZestimateFromHtml(zpid: number): Promise<{ value: number | null; debug?: string }> {
   try {
     const res = await fetch(`https://www.zillow.com/homedetails/${zpid}_zpid/`, {
       headers: {
@@ -15,23 +16,24 @@ async function getZestimateFromHtml(zpid: number): Promise<number | null> {
       },
       signal: AbortSignal.timeout(12000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { value: null, debug: `HTTP ${res.status}` };
     const html = await res.text();
+    const snippet = html.substring(0, 200);
+    const hasZestimate = html.includes("zestimate");
 
-    // Search for zestimate in various patterns in the HTML
     const patterns = [
       /"zestimate":(\d+)/,
       /"Zestimate":(\d+)/,
       /"zestimateLow":(\d+)/,
-      /\"homeValue\":(\d+)/,
+      /"homeValue":(\d+)/,
     ];
     for (const p of patterns) {
       const m = html.match(p);
-      if (m && Number(m[1]) > 1000) return Number(m[1]);
+      if (m && Number(m[1]) > 1000) return { value: Number(m[1]) };
     }
-    return null;
-  } catch {
-    return null;
+    return { value: null, debug: `len=${html.length} hasZ=${hasZestimate} snippet=${snippet}` };
+  } catch (e) {
+    return { value: null, debug: String(e) };
   }
 }
 
@@ -99,12 +101,17 @@ export async function GET(req: NextRequest) {
   }
 
   const [zR, rR] = await Promise.allSettled([
-    zpid ? getZestimateFromHtml(zpid) : Promise.resolve(null),
+    zpid ? getZestimateFromHtml(zpid) : Promise.resolve({ value: null }),
     address ? getRedfin(address) : Promise.resolve(null),
   ]);
 
-  const zillow = zR.status === "fulfilled" ? zR.value : null;
+  const zResult = zR.status === "fulfilled" ? zR.value : { value: null, debug: String((zR as PromiseRejectedResult).reason) };
+  const zillow = zResult?.value ?? null;
   const redfin = rR.status === "fulfilled" ? rR.value : null;
 
+  const debug = params.get("debug");
+  if (debug) {
+    return NextResponse.json({ zillow, redfin, realtorCom: null, zpid, _zDebug: (zResult as { debug?: string })?.debug });
+  }
   return NextResponse.json({ zillow, redfin, realtorCom: null, zpid });
 }
