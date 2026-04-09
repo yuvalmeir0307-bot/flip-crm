@@ -3,6 +3,7 @@ export const STATUS_POOL = "The Pool";
 export const STATUS_NO_DEAL = "No Deal - Auto Reply";
 export const STATUS_REPLIED = "Replied";
 export const STATUS_POTENTIAL_DEAL = "Potential Deal";
+export const STATUS_GRAVEYARD = "Graveyard";
 
 // Polite auto-replies for non-HOT pool responses
 export function getPoolNeutralReply(name: string): string {

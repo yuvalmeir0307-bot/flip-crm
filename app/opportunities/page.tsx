@@ -753,6 +753,15 @@ function HotCard({ contact, onStatusChange, onSave }: {
         >
           Move to Pool
         </button>
+        <button
+          onClick={() => onStatusChange(contact.id, "Graveyard")}
+          style={{
+            background: "#4b556322", color: "#9ca3af", border: "1px solid #4b556344",
+            borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          Graveyard
+        </button>
         {qualifyState === "idle" && (
           <button
             onClick={qualifyCall}

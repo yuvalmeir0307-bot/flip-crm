@@ -23,6 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   "No Deal - Auto Reply": "#ef4444",
   "Underwriting": "#22c55e",
   "60-Day Rest": "#6b7280",
+  "Graveyard": "#4b5563",
 };
 
 const STATUS_SHORT: Record<string, string> = {
@@ -35,12 +36,13 @@ const STATUS_SHORT: Record<string, string> = {
   "No Deal - Auto Reply": "No Deal",
   "Underwriting": "Closed",
   "60-Day Rest": "60-Day Rest",
+  "Graveyard": "Graveyard",
 };
 
 const ALL_STATUSES = [
   "Drip Active", "The Pool", "Replied - Pivot Call Needed - HOT",
   "Replied", "Potential Deal", "Offer Submitted",
-  "No Deal - Auto Reply", "Underwriting", "60-Day Rest",
+  "No Deal - Auto Reply", "Underwriting", "60-Day Rest", "Graveyard",
 ];
 
 const FILTER_TABS = [
