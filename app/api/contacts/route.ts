@@ -33,18 +33,15 @@ export async function PATCH(req: NextRequest) {
   const notionProps: Record<string, unknown> = {};
   if (properties.status) {
     notionProps["Status"] = { select: { name: properties.status } };
-    // When manually setting to HOT, reset drip/pool steps so no messages fire
-    if (properties.status === "Replied - Pivot Call Needed - HOT") {
-      notionProps["Drip step"] = { number: 0 };
-      notionProps["Pool step"] = { number: 0 };
-    }
-    // When manually moving to The Pool, always set pool step to 1 and Date to 7 days from now
-    // so the first pool follow-up fires at the correct time (not immediately).
-    // Date is set unconditionally here to prevent any override below from causing an immediate cron pickup.
+    // When manually moving to The Pool, set pool step and schedule next message.
+    // If poolStep is provided (e.g. 5 for returning Potential Deal contacts), use it;
+    // otherwise default to step 1 for fresh pool entry.
     if (properties.status === "The Pool") {
-      notionProps["Pool step"] = { number: properties.poolStep ?? 1 };
+      const poolStep = properties.poolStep ?? 1;
+      notionProps["Pool step"] = { number: poolStep };
       const nextDate = new Date();
-      nextDate.setDate(nextDate.getDate() + 7);
+      // Use a reasonable delay: step 1 = 7 days, higher steps = 10 days (warm relationship)
+      nextDate.setDate(nextDate.getDate() + (poolStep >= 5 ? 10 : 7));
       notionProps["Date"] = { date: { start: nextDate.toISOString().split("T")[0] } };
     }
   }

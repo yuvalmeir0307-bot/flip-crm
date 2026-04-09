@@ -1,8 +1,19 @@
 export const STATUS_DRIP = "Drip Active";
 export const STATUS_POOL = "The Pool";
-export const STATUS_HOT = "Replied - Pivot Call Needed - HOT";
 export const STATUS_NO_DEAL = "No Deal - Auto Reply";
 export const STATUS_REPLIED = "Replied";
+export const STATUS_POTENTIAL_DEAL = "Potential Deal";
+
+// Polite auto-replies for non-HOT pool responses
+export function getPoolNeutralReply(name: string): string {
+  const firstName = name.split(" ")[0] || "there";
+  return `Thanks for getting back to me, ${firstName}! I'll keep you in mind and reach out when something interesting comes up on my end.`;
+}
+
+export function getPoolNoDealReply(name: string): string {
+  const firstName = name.split(" ")[0] || "there";
+  return `Totally understood, no worries at all! Thanks for the response, ${firstName}. I'll be in touch down the road — hope you have a great week!`;
+}
 
 // Drip: 5 messages over 5 days — Hieu's system
 // Step 0: immediate | Step 1: next day | Step 2: +1 day | Step 3: +1 day | Step 4: +1 day → Pool

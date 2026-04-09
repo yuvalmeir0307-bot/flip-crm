@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findContactByPhone, updateContact, extractContactProps } from "@/lib/notion";
 import { classifyReply } from "@/lib/gemini";
-import { STATUS_HOT, STATUS_NO_DEAL, STATUS_REPLIED } from "@/lib/drip";
+import { STATUS_NO_DEAL, STATUS_REPLIED, STATUS_POTENTIAL_DEAL, getPoolNeutralReply, getPoolNoDealReply } from "@/lib/drip";
 import { sendSMS, getSenderByName, getSender } from "@/lib/openphone";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 import { createLog } from "@/lib/logs";
-
-// Pool steps where last message was a relationship builder → trigger pivot
-const RELATIONSHIP_BUILDER_STEPS = new Set([3, 8]); // after step 2 and step 7 are sent
-const PIVOT_MESSAGE = "Thanks for that. What can I buy right now?";
 
 const STOP_KEYWORDS = ["stop", "unsubscribe", "remove me", "opt out", "optout"];
 
@@ -55,44 +51,62 @@ export async function POST(req: NextRequest) {
       "Last Contact": { date: { start: new Date().toISOString() } },
     };
 
-    // Only classify & change status for Drip Active / The Pool contacts
-    if (contact.status === "Drip Active" || contact.status === "The Pool") {
+    // Classify & change status for Drip Active / The Pool contacts
+    let poolAutoReply: string | null = null;
+
+    if (contact.status === "Drip Active") {
+      // Drip campaign reply → set Replied status
       if (eventType === "SMS") {
         try {
           const classification = await classifyReply(content);
           if (classification === "NO_DEAL") {
             updateProps.Status = { select: { name: STATUS_NO_DEAL } };
-          } else if (classification === "HOT") {
-            updateProps.Status = { select: { name: STATUS_HOT } };
           } else {
+            // HOT or NEUTRAL from drip → Replied
             updateProps.Status = { select: { name: STATUS_REPLIED } };
           }
         } catch {
           // If Gemini fails, still save the reply
         }
       } else {
-        // Phone call — mark HOT for manual follow-up
-        updateProps.Status = { select: { name: STATUS_HOT } };
+        // Phone call from drip → Replied
+        updateProps.Status = { select: { name: STATUS_REPLIED } };
+      }
+    } else if (contact.status === "The Pool") {
+      // Pool reply → either Potential Deal (HOT) or polite auto-reply (anything else)
+      if (eventType === "SMS") {
+        try {
+          const classification = await classifyReply(content);
+          if (classification === "HOT") {
+            updateProps.Status = { select: { name: STATUS_POTENTIAL_DEAL } };
+          } else {
+            // NO_DEAL or NEUTRAL — send polite message, keep in pool
+            poolAutoReply = classification === "NO_DEAL"
+              ? getPoolNoDealReply(contact.name)
+              : getPoolNeutralReply(contact.name);
+          }
+        } catch {
+          // If Gemini fails, still save the reply
+        }
+      } else {
+        // Phone call from pool → Potential Deal
+        updateProps.Status = { select: { name: STATUS_POTENTIAL_DEAL } };
       }
     }
 
     await updateContact(contact.id, updateProps);
     console.log("[webhook] saved reply for:", contact.name, contact.phone);
 
-    // Auto-pivot after relationship builder reply (Pool steps 2 & 7)
-    if (
-      eventType === "SMS" &&
-      contact.status === "The Pool" &&
-      RELATIONSHIP_BUILDER_STEPS.has(contact.poolStep ?? 0)
-    ) {
+    // Send polite auto-reply for non-HOT pool responses
+    if (poolAutoReply) {
       try {
         const senderPhone = contact.assignedTo
           ? getSenderByName(contact.assignedTo)
           : getSender(0);
-        await sendSMS(contact.phone, PIVOT_MESSAGE, senderPhone);
-        console.log("[webhook] pivot sent to:", contact.name);
+        await sendSMS(contact.phone, poolAutoReply, senderPhone);
+        console.log("[webhook] pool auto-reply sent to:", contact.name);
       } catch (e) {
-        console.error("[webhook] pivot send failed:", e);
+        console.error("[webhook] pool auto-reply failed:", e);
       }
     }
 

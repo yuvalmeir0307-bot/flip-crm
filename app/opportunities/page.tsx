@@ -708,7 +708,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
           border: "1px solid #f9731644",
           borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700,
         }}>
-          🔥 Replied - HOT
+          💬 Replied
         </span>
       </div>
 
@@ -1199,10 +1199,11 @@ function MAOSection({ contact, onSave }: {
   );
 }
 
-function DealCard({ contact, onSave, onStatusChange }: {
+function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
   contact: Contact;
   onSave: (id: string, data: Partial<Contact>) => void;
   onStatusChange: (id: string, status: string) => void;
+  onMoveToPool: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(contact.notes);
@@ -1581,6 +1582,15 @@ function DealCard({ contact, onSave, onStatusChange }: {
                 </div>
               </div>
             )}
+            <button
+              onClick={() => onMoveToPool(contact.id)}
+              style={{
+                background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744",
+                borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Move back to Pool
+            </button>
           </>
         )}
       </div>
@@ -1630,7 +1640,7 @@ function InsightsPanel({ allContacts }: { allContacts: Contact[] }) {
     return d < today;
   });
 
-  const hotLeads = allContacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT");
+  const hotLeads = allContacts.filter((c) => c.status === "Replied");
   const potentialDeals = allContacts.filter((c) => c.status === "Potential Deal");
   const hotWarmth = allContacts.filter((c) => c.warmth === "Hot");
   const warmWarmth = allContacts.filter((c) => c.warmth === "Warm");
@@ -1674,7 +1684,7 @@ function InsightsPanel({ allContacts }: { allContacts: Contact[] }) {
       {/* Stat Grid */}
       <div className="kpi-grid-3" style={{ marginBottom: 24 }}>
         {[
-          { label: "Hot Leads", value: hotLeads.length, color: "#f97316", sub: "Replied — pivot call needed" },
+          { label: "Replied (Drip)", value: hotLeads.length, color: "#f97316", sub: "Replied from drip campaign" },
           { label: "Potential Deals", value: potentialDeals.length, color: "#10b981", sub: "Active deal pipeline" },
           { label: `Follow-Ups (${periodLabel})`, value: followUpsInPeriod.length, color: "#6366f1", sub: `Scheduled in this ${period}` },
           { label: "Overdue Follow-Ups", value: overdueFollowUps.length, color: overdueFollowUps.length > 0 ? "#ef4444" : "#10b981", sub: "Past due date" },
@@ -1768,7 +1778,7 @@ export default function OpportunitiesPage() {
     const all: Contact[] = await res.json();
     setAllContacts(all);
     setContacts(all.filter((c) =>
-      c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied" || c.status === "Potential Deal"
+      c.status === "Replied" || c.status === "Potential Deal"
     ));
     setLoading(false);
   }
@@ -1782,6 +1792,16 @@ export default function OpportunitiesPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
   }
 
+  // Move a Potential Deal back to The Pool at step 5 (long-term relationship stage)
+  async function handleMoveBackToPool(id: string) {
+    await fetch("/api/contacts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "The Pool", poolStep: 5 }),
+    });
+    setContacts((prev) => prev.filter((c) => c.id !== id));
+  }
+
   async function handleSave(id: string, data: Partial<Contact>) {
     await fetch("/api/contacts", {
       method: "PATCH",
@@ -1791,7 +1811,7 @@ export default function OpportunitiesPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, ...data } : c));
   }
 
-  const hotContacts = contacts.filter((c) => c.status === "Replied - Pivot Call Needed - HOT" || c.status === "Replied");
+  const hotContacts = contacts.filter((c) => c.status === "Replied");
   const dealContacts = contacts.filter((c) => c.status === "Potential Deal");
 
   const TABS = [
@@ -1808,7 +1828,7 @@ export default function OpportunitiesPage() {
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Opportunities</h1>
           <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>
-            {contacts.filter(c => c.status === "Replied - Pivot Call Needed - HOT").length} hot · {contacts.filter(c => c.status === "Replied").length} replied · {dealContacts.length} potential deals
+            {contacts.filter(c => c.status === "Replied").length} replied · {dealContacts.length} potential deals
           </p>
         </div>
 
@@ -1843,7 +1863,7 @@ export default function OpportunitiesPage() {
         ) : (
           <div className="opportunities-columns">
 
-            {/* Replied - HOT */}
+            {/* Replied (from drip campaign) */}
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                 <div style={{
@@ -1851,7 +1871,7 @@ export default function OpportunitiesPage() {
                   boxShadow: "0 0 8px #f97316",
                 }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Replied — HOT
+                  Replied
                 </span>
                 <span style={{
                   background: "#f9731622", color: "#fb923c",
@@ -1950,7 +1970,7 @@ export default function OpportunitiesPage() {
                     No potential deals yet
                   </div>
                 ) : dealContacts.map((c) => (
-                  <DealCard key={c.id} contact={c} onSave={handleSave} onStatusChange={handleStatusChange} />
+                  <DealCard key={c.id} contact={c} onSave={handleSave} onStatusChange={handleStatusChange} onMoveToPool={handleMoveBackToPool} />
                 ))}
               </div>
             </div>
