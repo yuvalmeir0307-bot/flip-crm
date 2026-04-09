@@ -825,64 +825,37 @@ function MAOSection({ contact, onSave }: {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Client-side estimate fetch — calls Zillow/Redfin directly from the browser
-  // (server-side calls are blocked by their datacenter IP detection)
+  // Fetch estimates: client resolves zpid via Zillow autocomplete (no CORS),
+  // then passes it to our API route which fetches Zillow HTML + Redfin server-side.
   useEffect(() => {
     const addr = propertyAddress.trim();
     if (addr.length < 8) { setFetchError(""); return; }
     const t = setTimeout(async () => {
       setFetching(true);
       setFetchError("");
-      let found = false;
       try {
-        // Step 1: autocomplete → zpid
-        const acRes = await fetch(
-          `https://www.zillowstatic.com/autocomplete/v3/suggestions?q=${encodeURIComponent(addr)}&abKey=abcdefgh`,
-          { headers: { Accept: "application/json" } }
-        );
-        const acJson = await acRes.json();
-        const zpid = acJson?.results?.[0]?.metaData?.zpid;
-
-        // Step 2: zpid → zestimate via GraphQL persisted query
-        if (zpid) {
-          const hash = "3b51e213e2bc8dbf539cdb31f809991a62e1f5ce3cc0d011a8391839e024fa4e";
-          const vars = { zpid, altId: null, deviceTypeV2: "WEB_DESKTOP", includeLastSoldListing: true };
-          const gqlUrl = `https://www.zillow.com/graphql/?extensions=${encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: hash } }))}&variables=${encodeURIComponent(JSON.stringify(vars))}`;
-          const gqlRes = await fetch(gqlUrl, {
-            headers: { "content-type": "application/json", "client-id": "home-details-page" },
-          });
-          const gqlJson = await gqlRes.json();
-          const z = gqlJson?.data?.property?.zestimate;
-          if (z && z > 0) { setZillow(Math.round(z)); found = true; }
-        }
-      } catch { /* Zillow failed, continue */ }
-
-      try {
-        // Redfin: autocomplete → AVM
-        const rfAc = await fetch(
-          `https://www.redfin.com/stingray/do/location-autocomplete?location=${encodeURIComponent(addr)}&v=2`,
-          { headers: { Accept: "text/javascript" } }
-        );
-        const rfAcText = (await rfAc.text()).replace(/^\{\}&&/, "");
-        const rfAcJson = JSON.parse(rfAcText);
-        const prop = rfAcJson?.payload?.exactMatch ?? rfAcJson?.payload?.sections?.[0]?.rows?.[0];
-        const pid = prop?.id?.tableId;
-        if (pid) {
-          const rfDet = await fetch(
-            `https://www.redfin.com/stingray/api/home/details/aboveTheFold?propertyId=${pid}&accessLevel=3`,
-            { headers: { Accept: "text/javascript" } }
+        // Step 1 (client): autocomplete → zpid (zillowstatic has permissive CORS)
+        let zpid: number | null = null;
+        try {
+          const acRes = await fetch(
+            `https://www.zillowstatic.com/autocomplete/v3/suggestions?q=${encodeURIComponent(addr)}&abKey=abcdefgh`,
+            { headers: { Accept: "application/json" } }
           );
-          const rfDetText = (await rfDet.text()).replace(/^\{\}&&/, "");
-          const rfDetJson = JSON.parse(rfDetText);
-          const avm =
-            rfDetJson?.payload?.avmInfo?.predictedValue ??
-            rfDetJson?.payload?.avm?.predictedValue ??
-            rfDetJson?.payload?.propertySection?.priceInfo?.amount;
-          if (avm && Number(avm) > 0) { setRedfin(Math.round(Number(avm))); found = true; }
-        }
-      } catch { /* Redfin failed, continue */ }
+          const acJson = await acRes.json();
+          zpid = acJson?.results?.[0]?.metaData?.zpid ?? null;
+        } catch { /* autocomplete failed */ }
 
-      if (!found) setFetchError("No estimates found — enter values manually");
+        // Step 2 (server): pass zpid + address to our API which fetches HTML server-side
+        const url = zpid
+          ? `/api/property-estimate?zpid=${zpid}&address=${encodeURIComponent(addr)}`
+          : `/api/property-estimate?address=${encodeURIComponent(addr)}`;
+        const res = await fetch(url, { credentials: "include" });
+        const data = await res.json();
+        if (data.zillow)     setZillow(Math.round(data.zillow));
+        if (data.redfin)     setRedfin(Math.round(data.redfin));
+        if (data.realtorCom) setRealtorCom(Math.round(data.realtorCom));
+        if (!data.zillow && !data.redfin && !data.realtorCom) setFetchError("No estimates found — enter values manually");
+      } catch { setFetchError("Fetch failed — enter values manually"); }
       setFetching(false);
     }, 1500);
     return () => clearTimeout(t);
