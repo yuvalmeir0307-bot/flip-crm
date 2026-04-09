@@ -354,7 +354,7 @@ function ContactsPageInner() {
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
             display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
           }}>
-            <div style={{ background: "#1a1a1a", borderRadius: 16, padding: 32, width: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ background: "#1a1a1a", borderRadius: 16, padding: 32, width: "100%", maxWidth: 540, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 20 }}>New Contact</h2>
               <form onSubmit={addContact}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -417,6 +417,7 @@ function ContactsPageInner() {
           {loading ? (
             <p style={{ padding: 24, color: "#555", fontSize: 14 }}>Loading contacts...</p>
           ) : (
+            <div className="table-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "#141414" }}>
@@ -486,6 +487,7 @@ function ContactsPageInner() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

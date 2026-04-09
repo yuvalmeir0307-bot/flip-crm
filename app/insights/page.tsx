@@ -239,7 +239,7 @@ export default function Insights() {
     <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
       <Sidebar />
 
-      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+      <div className="app-main">
         {/* Header */}
         <div
           style={{
@@ -293,14 +293,7 @@ export default function Insights() {
         </div>
 
         {/* 4 count cards */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 14,
-            marginBottom: 14,
-          }}
-        >
+        <div className="kpi-grid-4" style={{ marginBottom: 14 }}>
           <StatCard
             label="Messages Sent"
             value={messagesSent}
@@ -328,13 +321,7 @@ export default function Insights() {
         </div>
 
         {/* 2 rate cards */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gap: 14,
-          }}
-        >
+        <div className="kpi-grid-2" style={{ gap: 14 }}>
           <RateCard
             label="Reply Rate"
             color="#f97316"

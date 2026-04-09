@@ -393,7 +393,7 @@ export default function SettingsPage() {
 
                   {/* ── 4 Check Cards ── */}
                   {lastData && (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+                    <div className="kpi-grid-4" style={{ gap: 10, marginBottom: 20 }}>
                       {(["health", "structure", "performance", "regression"] as const).map((key) => {
                         const c = lastData.checks[key];
                         const ok = c.passed;
@@ -563,6 +563,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden", marginBottom: 28 }}>
+                  <div className="table-scroll">
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr>{["Status","Date","Contact","Phone","Step","Message","Error"].map((h) => (
@@ -589,6 +590,7 @@ export default function SettingsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 
@@ -606,6 +608,7 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden" }}>
+                      <div className="table-scroll">
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                         <thead><tr>{["Type","Title","Phone","Details","Time",""].map((h) => (
                           <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
@@ -625,6 +628,7 @@ export default function SettingsPage() {
                           </tr>
                         ))}</tbody>
                       </table>
+                      </div>
                     </div>
                   )}
               </div>

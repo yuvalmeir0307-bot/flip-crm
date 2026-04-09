@@ -62,8 +62,8 @@ function StepCard({ script, onSave, onDelete, onTest }: {
   return (
     <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontWeight: 600, fontSize: 14, color: "#ffffff" }}>
             Step {stepNum} ◆ {script.label}
           </span>
@@ -71,7 +71,7 @@ function StepCard({ script, onSave, onDelete, onTest }: {
             {badgeLabel}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "#555" }}>⏱ {delayLabel(script.delay)}</span>
 
           {/* Test */}
@@ -297,8 +297,8 @@ export default function ScriptsPage() {
                 <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 14 }}>
                   New Step — {tab === "Drip" ? `Step ${dripScripts.length + 1}` : `Pool Step ${poolScripts.length + 1}`}
                 </p>
-                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                  <input placeholder="Label (e.g. Follow Up)" value={newStep.label} onChange={(e) => setNewStep({ ...newStep, label: e.target.value })} required />
+                <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                  <input placeholder="Label (e.g. Follow Up)" value={newStep.label} onChange={(e) => setNewStep({ ...newStep, label: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
                   <input type="number" placeholder="Delay (days)" value={newStep.delay} onChange={(e) => setNewStep({ ...newStep, delay: Number(e.target.value) })} required min={1} style={{ width: 140 }} />
                 </div>
                 <textarea placeholder="Message — use [Name] and [Sender]" value={newStep.message} onChange={(e) => setNewStep({ ...newStep, message: e.target.value })} required rows={4} style={{ marginBottom: 12 }} />
