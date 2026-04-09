@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
-// Step 1: Address → zpid via Zillow autocomplete
+// Step 1: Address → zpid via Zillow autocomplete (works server-side, no auth needed)
 async function getZpid(address: string): Promise<number | null> {
   try {
     const url = `https://www.zillowstatic.com/autocomplete/v3/suggestions?q=${encodeURIComponent(address)}&abKey=abcdefgh`;
@@ -19,8 +19,8 @@ async function getZpid(address: string): Promise<number | null> {
   }
 }
 
-// Step 2: zpid → zestimate via Zillow GraphQL persisted query
-async function getZestimate(zpid: number): Promise<number | null> {
+// Step 2: zpid → zestimate using the browser's own cookies + headers (forwarded from the client)
+async function getZestimate(zpid: number, forwardHeaders: Record<string, string>): Promise<number | null> {
   try {
     const hash = "3b51e213e2bc8dbf539cdb31f809991a62e1f5ce3cc0d011a8391839e024fa4e";
     const vars = { zpid, altId: null, deviceTypeV2: "WEB_DESKTOP", includeLastSoldListing: true };
@@ -28,11 +28,12 @@ async function getZestimate(zpid: number): Promise<number | null> {
       `https://www.zillow.com/graphql/?extensions=${encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: hash } }))}&variables=${encodeURIComponent(JSON.stringify(vars))}`;
     const res = await fetch(url, {
       headers: {
-        "User-Agent": UA,
+        "User-Agent": forwardHeaders["user-agent"] || UA,
         "content-type": "application/json",
         "client-id": "home-details-page",
         "Referer": "https://www.zillow.com/",
         "Accept": "application/json",
+        ...(forwardHeaders["cookie"] ? { "Cookie": forwardHeaders["cookie"] } : {}),
       },
       signal: AbortSignal.timeout(10000),
     });
@@ -46,12 +47,13 @@ async function getZestimate(zpid: number): Promise<number | null> {
 }
 
 // Redfin: autocomplete → property details → AVM
-async function getRedfin(address: string): Promise<number | null> {
+async function getRedfin(address: string, forwardHeaders: Record<string, string>): Promise<number | null> {
   try {
+    const ua = forwardHeaders["user-agent"] || UA;
     const acRes = await fetch(
       `https://www.redfin.com/stingray/do/location-autocomplete?location=${encodeURIComponent(address)}&v=2`,
       {
-        headers: { "User-Agent": UA, "Accept": "text/javascript", "Referer": "https://www.redfin.com/" },
+        headers: { "User-Agent": ua, "Accept": "text/javascript", "Referer": "https://www.redfin.com/" },
         signal: AbortSignal.timeout(8000),
       }
     );
@@ -65,7 +67,7 @@ async function getRedfin(address: string): Promise<number | null> {
     const detRes = await fetch(
       `https://www.redfin.com/stingray/api/home/details/aboveTheFold?propertyId=${pid}&accessLevel=3`,
       {
-        headers: { "User-Agent": UA, "Accept": "text/javascript", "Referer": "https://www.redfin.com/" },
+        headers: { "User-Agent": ua, "Accept": "text/javascript", "Referer": "https://www.redfin.com/" },
         signal: AbortSignal.timeout(8000),
       }
     );
@@ -88,16 +90,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Address too short" }, { status: 400 });
   }
 
-  // Get zpid first (needed for Zillow), then fetch both in parallel
+  // Forward browser headers so Zillow/Redfin see a real browser request
+  const forwardHeaders: Record<string, string> = {};
+  const headersToCopy = ["user-agent", "accept-language", "cookie"];
+  headersToCopy.forEach((h) => {
+    const v = req.headers.get(h);
+    if (v) forwardHeaders[h] = v;
+  });
+
+  // Get zpid first (needed for Zillow zestimate), then fetch both in parallel
   const zpid = await getZpid(address);
 
   const [zR, rR] = await Promise.allSettled([
-    zpid ? getZestimate(zpid) : Promise.resolve(null),
-    getRedfin(address),
+    zpid ? getZestimate(zpid, forwardHeaders) : Promise.resolve(null),
+    getRedfin(address, forwardHeaders),
   ]);
 
   const zillow = zR.status === "fulfilled" ? zR.value : null;
   const redfin = rR.status === "fulfilled" ? rR.value : null;
 
-  return NextResponse.json({ zillow, redfin, realtorCom: null, zpid });
+  return NextResponse.json({ zillow, redfin, realtorCom: null, zpid: zpid ?? null });
 }
