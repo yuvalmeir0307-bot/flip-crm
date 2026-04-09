@@ -274,12 +274,6 @@ export default function ScriptsPage() {
           </button>
         </div>
 
-        {/* Pool info */}
-        {tab === "Pool" && (
-          <div style={{ background: "#00e5ff11", border: "1px solid #00e5ff33", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#00e5ff" }}>
-            📋 Agents enter The Pool after completing Drip step 4.
-          </div>
-        )}
 
         {error && <p style={{ color: "#ef4444", fontSize: 14, textAlign: "center", padding: 24 }}>{error}</p>}
 
