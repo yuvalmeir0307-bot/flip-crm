@@ -88,6 +88,12 @@ select option { background: #1a1a1a; }
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
+.opportunities-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
 
 /* ── Mobile breakpoint ── */
 @media (max-width: 768px) {
@@ -163,6 +169,7 @@ select option { background: #1a1a1a; }
   .kpi-grid-2 { grid-template-columns: 1fr !important; }
   .kpi-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
   .dashboard-goals-grid { grid-template-columns: 1fr !important; }
+  .opportunities-columns { grid-template-columns: 1fr !important; gap: 20px !important; }
 
   /* Smaller fonts on mobile */
   h1 { font-size: 20px !important; }

@@ -1672,7 +1672,7 @@ function InsightsPanel({ allContacts }: { allContacts: Contact[] }) {
       </div>
 
       {/* Stat Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="kpi-grid-3" style={{ marginBottom: 24 }}>
         {[
           { label: "Hot Leads", value: hotLeads.length, color: "#f97316", sub: "Replied — pivot call needed" },
           { label: "Potential Deals", value: potentialDeals.length, color: "#10b981", sub: "Active deal pipeline" },
@@ -1800,9 +1800,9 @@ export default function OpportunitiesPage() {
   ];
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#ffffff" }}>
+    <div className="app-root">
       <Sidebar />
-      <div style={{ flex: 1, padding: "32px 36px", overflow: "auto" }}>
+      <div className="app-main">
 
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
@@ -1841,7 +1841,7 @@ export default function OpportunitiesPage() {
         ) : activeTab === "insights" ? (
           <InsightsPanel allContacts={allContacts} />
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
+          <div className="opportunities-columns">
 
             {/* Replied - HOT */}
             <div>
