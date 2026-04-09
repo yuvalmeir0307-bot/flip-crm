@@ -813,8 +813,6 @@ function MAOSection({ contact, onSave }: {
   const [maoOverride, setMaoOverride] = useState<string>(contact.maoOverride != null ? String(contact.maoOverride) : "");
   // Jerry mode state
   const [propertyAddress, setPropertyAddress] = useState(contact.propertyAddress ?? "");
-  const [fetching, setFetching] = useState(false);
-  const [fetchError, setFetchError] = useState("");
   const [zillow, setZillow] = useState(contact.zillow ?? 0);
   const [realtorCom, setRealtorCom] = useState(contact.realtorCom ?? 0);
   const [redfin, setRedfin] = useState(contact.redfin ?? 0);
@@ -825,41 +823,17 @@ function MAOSection({ contact, onSave }: {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Fetch estimates: client resolves zpid via Zillow autocomplete (no CORS),
-  // then passes it to our API route which fetches Zillow HTML + Redfin server-side.
-  useEffect(() => {
-    const addr = propertyAddress.trim();
-    if (addr.length < 8) { setFetchError(""); return; }
-    const t = setTimeout(async () => {
-      setFetching(true);
-      setFetchError("");
-      try {
-        // Step 1 (client): autocomplete → zpid (zillowstatic has permissive CORS)
-        let zpid: number | null = null;
-        try {
-          const acRes = await fetch(
-            `https://www.zillowstatic.com/autocomplete/v3/suggestions?q=${encodeURIComponent(addr)}&abKey=abcdefgh`,
-            { headers: { Accept: "application/json" } }
-          );
-          const acJson = await acRes.json();
-          zpid = acJson?.results?.[0]?.metaData?.zpid ?? null;
-        } catch { /* autocomplete failed */ }
-
-        // Step 2 (server): pass zpid + address to our API which fetches HTML server-side
-        const url = zpid
-          ? `/api/property-estimate?zpid=${zpid}&address=${encodeURIComponent(addr)}`
-          : `/api/property-estimate?address=${encodeURIComponent(addr)}`;
-        const res = await fetch(url, { credentials: "include" });
-        const data = await res.json();
-        if (data.zillow)     setZillow(Math.round(data.zillow));
-        if (data.redfin)     setRedfin(Math.round(data.redfin));
-        if (data.realtorCom) setRealtorCom(Math.round(data.realtorCom));
-        if (!data.zillow && !data.redfin && !data.realtorCom) setFetchError("No estimates found — enter values manually");
-      } catch { setFetchError("Fetch failed — enter values manually"); }
-      setFetching(false);
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [propertyAddress]);
+  // Build quick-open URLs for Zillow / Redfin / Realtor.com when address is entered
+  const addrEncoded = encodeURIComponent(propertyAddress.trim());
+  const zillowUrl = propertyAddress.trim()
+    ? `https://www.zillow.com/homes/${addrEncoded}_rb/`
+    : "https://www.zillow.com";
+  const redfinUrl = propertyAddress.trim()
+    ? `https://www.redfin.com/city/0/filter/location=${addrEncoded}`
+    : "https://www.redfin.com";
+  const realtorUrl = propertyAddress.trim()
+    ? `https://www.realtor.com/realestateandhomes-search/${addrEncoded}`
+    : "https://www.realtor.com";
 
   // Flip / Rental calcs
   const calcFlipMAO = arv * (flipFactor / 100) - rehabCost;
@@ -987,26 +961,42 @@ function MAOSection({ contact, onSave }: {
           {/* ── JERRY MODE ── */}
           {dealMode === "jerry" && (
             <>
-              {/* Address Auto-Fetch */}
+              {/* Property Address + Quick-Open Links */}
               <div style={{ marginBottom: 12 }}>
                 <label style={labelStyle}>Property Address</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="text"
-                    value={propertyAddress}
-                    onChange={(e) => setPropertyAddress(e.target.value)}
-                    placeholder="123 Main St, City, State"
-                    style={{ ...inputStyle, paddingRight: 32 }}
-                  />
-                  {fetching && (
-                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: jerryColor }}>⟳</span>
-                  )}
-                </div>
-                {fetching && (
-                  <div style={{ fontSize: 10, color: jerryColor, marginTop: 4 }}>Fetching estimates from Zillow & Redfin…</div>
-                )}
-                {fetchError && !fetching && (
-                  <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>{fetchError}</div>
+                <input
+                  type="text"
+                  value={propertyAddress}
+                  onChange={(e) => setPropertyAddress(e.target.value)}
+                  placeholder="123 Main St, City, State"
+                  style={inputStyle}
+                />
+                {propertyAddress.trim().length > 5 && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                    {[
+                      { label: "Zillow", url: zillowUrl, color: "#006aff" },
+                      { label: "Redfin", url: redfinUrl, color: "#e52628" },
+                      { label: "Realtor", url: realtorUrl, color: "#d9232d" },
+                    ].map(({ label, url, color }) => (
+                      <a
+                        key={label}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: 10, fontWeight: 700, padding: "3px 10px",
+                          borderRadius: 20, border: `1px solid ${color}55`,
+                          color, background: `${color}11`,
+                          textDecoration: "none", cursor: "pointer",
+                        }}
+                      >
+                        ↗ {label}
+                      </a>
+                    ))}
+                    <span style={{ fontSize: 10, color: "#444", alignSelf: "center", marginLeft: 2 }}>
+                      — copy values below
+                    </span>
+                  </div>
                 )}
               </div>
 
