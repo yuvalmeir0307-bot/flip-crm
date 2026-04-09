@@ -60,14 +60,25 @@ function InfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ContactDetailModal({ contact, onClose, onStatusChange }: {
+function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange }: {
   contact: Contact;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
+  onStageChange: (id: string, step: number) => Promise<void>;
 }) {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
   const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
+  const [stageState, setStageState] = useState<"idle" | "input" | "confirm">("idle");
+  const [stageInput, setStageInput] = useState("");
+  const [pendingStep, setPendingStep] = useState<number>(0);
+  const [stageSaving, setStageSaving] = useState(false);
+
+  const canEditStage = contact.status === "Drip Active" || contact.status === "The Pool";
+  const maxStep = contact.status === "Drip Active" ? 4 : 9;
+  const minStep = contact.status === "Drip Active" ? 0 : 1;
+  const currentStep = contact.status === "The Pool" ? contact.poolStep : contact.dripStep;
+  const stageLabel = contact.status === "The Pool" ? "Pool" : "Drip";
 
   async function initiateCall() {
     setCallState("calling");
@@ -182,6 +193,76 @@ function ContactDetailModal({ contact, onClose, onStatusChange }: {
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 16, borderTop: "1px solid #222" }}>
+          {/* Change Campaign Stage */}
+          {canEditStage && stageState === "idle" && (
+            <button
+              onClick={() => { setStageInput(String(currentStep)); setStageState("input"); }}
+              style={{
+                background: "#a855f722", color: "#a855f7", border: "1px solid #a855f744",
+                borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}
+            >
+              ✎ Change Stage
+            </button>
+          )}
+          {canEditStage && stageState === "input" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#a855f7", fontWeight: 600 }}>
+                {stageLabel} step ({minStep}–{maxStep}):
+              </span>
+              <input
+                type="number"
+                min={minStep}
+                max={maxStep}
+                value={stageInput}
+                onChange={(e) => setStageInput(e.target.value)}
+                style={{ width: 60, padding: "4px 8px", fontSize: 13, borderRadius: 6, background: "#2a2a2a", border: "1px solid #444", color: "#fff" }}
+              />
+              <button
+                onClick={() => {
+                  const n = parseInt(stageInput, 10);
+                  if (isNaN(n) || n < minStep || n > maxStep) return;
+                  setPendingStep(n);
+                  setStageState("confirm");
+                }}
+                style={{ background: "#a855f7", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setStageState("idle")}
+                style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {canEditStage && stageState === "confirm" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#fb923c", fontWeight: 600 }}>
+                Set to {stageLabel} {pendingStep}?
+              </span>
+              <button
+                disabled={stageSaving}
+                onClick={async () => {
+                  setStageSaving(true);
+                  await onStageChange(contact.id, pendingStep);
+                  setStageSaving(false);
+                  setStageState("idle");
+                }}
+                style={{ background: "#a855f7", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                {stageSaving ? "Saving..." : "Confirm"}
+              </button>
+              <button
+                onClick={() => setStageState("idle")}
+                style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
           {/* Call — only for contacts who replied or are in Pool (never cold call) */}
           {["Replied - Pivot Call Needed - HOT", "Replied", "The Pool", "Potential Deal", "Offer Submitted", "Underwriting"].includes(contact.status) && (
             <>
@@ -308,6 +389,19 @@ function ContactsPageInner() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
   }
 
+  async function updateStage(id: string, step: number) {
+    const contact = contacts.find((c) => c.id === id);
+    if (!contact) return;
+    const field = contact.status === "The Pool" ? "poolStep" : "dripStep";
+    await fetch("/api/contacts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, [field]: step }),
+    });
+    setContacts((prev) => prev.map((c) => c.id === id ? { ...c, [field]: step } : c));
+    setSelectedContact((prev) => prev?.id === id ? { ...prev, [field]: step } : prev);
+  }
+
   const filtered = contacts.filter((c) => {
     const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || (c.altPhones && c.altPhones.includes(search));
     const matchStatus = !filterStatus || c.status === filterStatus;
@@ -325,6 +419,7 @@ function ContactsPageInner() {
             contact={selectedContact}
             onClose={() => setSelectedContact(null)}
             onStatusChange={updateStatus}
+            onStageChange={updateStage}
           />
         )}
 
