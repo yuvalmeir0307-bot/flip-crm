@@ -1,4 +1,11 @@
 const API_KEY = process.env.OPENPHONE_API_KEY!;
+
+// OpenPhone API v1 requires phoneNumberId (e.g. "PNoBTtFxey") for the 'from' field,
+// NOT the E.164 phone number string. Set YUVAL_PHONE_ID / YAHAV_PHONE_ID in Vercel.
+const YUVAL_ID = process.env.YUVAL_PHONE_ID!;
+const YAHAV_ID = process.env.YAHAV_PHONE_ID!;
+
+// E.164 phone numbers — kept for UI display and personal alert recipients
 const YUVAL = process.env.YUVAL_PHONE_NUMBER!;
 const YAHAV = process.env.YAHAV_PHONE_NUMBER!;
 
@@ -8,18 +15,18 @@ const YAHAV_PERSONAL = process.env.YAHAV_PERSONAL_PHONE ?? YAHAV;
 
 // Alternates: index 0,2,4... = Yuval | index 1,3,5... = Yahav
 export function getSender(index: number): string {
-  return index % 2 === 0 ? YUVAL : YAHAV;
+  return index % 2 === 0 ? YUVAL_ID : YAHAV_ID;
 }
 
 export function getSenderName(index: number): string {
   return index % 2 === 0 ? "Yuval" : "Yahav";
 }
 
-// Resolve phone by agent name (used for pool follow-ups where assignedTo is known)
+// Resolve phoneNumberId by agent name (used for drip/pool sends)
 export function getSenderByName(name: string): string {
-  if (name.toLowerCase().includes("yuval")) return YUVAL;
-  if (name.toLowerCase().includes("yahav")) return YAHAV;
-  return YUVAL;
+  if (name.toLowerCase().includes("yuval")) return YUVAL_ID;
+  if (name.toLowerCase().includes("yahav")) return YAHAV_ID;
+  return YUVAL_ID;
 }
 
 export async function alertBothPartners(message: string): Promise<void> {
