@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/api/webhook",
   "/api/cron/",
   "/api/admin/backfill-assignments",
+  "/api/admin/fix-yuval-to-yahav",
   "/api/logs",
   "/api/qa-logs",
   "/api/qa-run",
