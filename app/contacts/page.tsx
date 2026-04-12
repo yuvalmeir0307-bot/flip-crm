@@ -62,11 +62,12 @@ function InfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange }: {
+function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange, onAssign }: {
   contact: Contact;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
   onStageChange: (id: string, step: number) => Promise<void>;
+  onAssign: (id: string, assignedTo: string) => Promise<void>;
 }) {
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
@@ -75,6 +76,9 @@ function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange }:
   const [stageInput, setStageInput] = useState("");
   const [pendingStep, setPendingStep] = useState<number>(0);
   const [stageSaving, setStageSaving] = useState(false);
+  const [assignState, setAssignState] = useState<"idle" | "select" | "confirm">("idle");
+  const [pendingAssignee, setPendingAssignee] = useState("");
+  const [assignSaving, setAssignSaving] = useState(false);
 
   const canEditStage = contact.status === "Drip Active" || contact.status === "The Pool";
   const maxStep = contact.status === "Drip Active" ? 4 : 9;
@@ -195,6 +199,70 @@ function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange }:
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 16, borderTop: "1px solid #222" }}>
+          {/* Assign To */}
+          {assignState === "idle" && (
+            <button
+              onClick={() => { setPendingAssignee(contact.assignedTo || "Yahav"); setAssignState("select"); }}
+              style={{
+                background: "#7c3aed22", color: "#a78bfa", border: "1px solid #7c3aed44",
+                borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}
+            >
+              👤 Assign To
+            </button>
+          )}
+          {assignState === "select" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600 }}>Assign to:</span>
+              <select
+                value={pendingAssignee}
+                onChange={(e) => setPendingAssignee(e.target.value)}
+                style={{ padding: "4px 8px", fontSize: 13, borderRadius: 6, background: "#2a2a2a", border: "1px solid #444", color: "#fff" }}
+              >
+                {TEAM_MEMBERS.filter(Boolean).filter(m => m !== "Both").map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setAssignState("confirm")}
+                style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setAssignState("idle")}
+                style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {assignState === "confirm" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#fb923c", fontWeight: 600 }}>
+                Assign to {pendingAssignee}?
+              </span>
+              <button
+                disabled={assignSaving}
+                onClick={async () => {
+                  setAssignSaving(true);
+                  await onAssign(contact.id, pendingAssignee);
+                  setAssignSaving(false);
+                  setAssignState("idle");
+                }}
+                style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                {assignSaving ? "Saving..." : "Confirm"}
+              </button>
+              <button
+                onClick={() => setAssignState("idle")}
+                style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
           {/* Change Campaign Stage */}
           {canEditStage && stageState === "idle" && (
             <button
@@ -391,6 +459,16 @@ function ContactsPageInner() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
   }
 
+  async function updateAssignment(id: string, assignedTo: string) {
+    await fetch("/api/contacts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, assignedTo }),
+    });
+    setContacts((prev) => prev.map((c) => c.id === id ? { ...c, assignedTo } : c));
+    setSelectedContact((prev) => prev?.id === id ? { ...prev, assignedTo } : prev);
+  }
+
   async function updateStage(id: string, step: number) {
     const contact = contacts.find((c) => c.id === id);
     if (!contact) return;
@@ -422,6 +500,7 @@ function ContactsPageInner() {
             onClose={() => setSelectedContact(null)}
             onStatusChange={updateStatus}
             onStageChange={updateStage}
+            onAssign={updateAssignment}
           />
         )}
 
