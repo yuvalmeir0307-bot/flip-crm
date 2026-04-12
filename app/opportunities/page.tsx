@@ -548,6 +548,7 @@ function HotCard({ contact, onStatusChange, onSave }: {
   const [qualifySetupUrl, setQualifySetupUrl] = useState("");
   const [qualification, setQualification] = useState<QualificationAnalysis | null>(null);
   const [qualifyCallMeta, setQualifyCallMeta] = useState<{ duration: number; answeredAt: string } | null>(null);
+  const [collapsed, setCollapsed] = useState(true);
 
   async function qualifyCall() {
     setQualifyState("loading");
@@ -613,10 +614,32 @@ function HotCard({ contact, onStatusChange, onSave }: {
       />
     )}
     <div style={{
-      background: "#1a1a1a", borderRadius: 14, padding: 20,
+      background: "#1a1a1a", borderRadius: 14,
       border: "1px solid #f9731622",
       boxShadow: "0 4px 20px rgba(249,115,22,0.08)",
+      overflow: "hidden",
     }}>
+      {/* Collapsed Header */}
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.phone}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ background: "#f9731622", color: "#fb923c", border: "1px solid #f9731644", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>💬 Replied</span>
+          {contact.followUpDate && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: new Date(contact.followUpDate) < new Date(new Date().toDateString()) ? "#ef4444" : new Date(contact.followUpDate).toDateString() === new Date().toDateString() ? "#facc15" : "#34d399" }}>
+              🗓 {new Date(contact.followUpDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+          )}
+          <span style={{ fontSize: 16, color: "#f97316", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.2s", display: "inline-block" }}>›</span>
+        </div>
+      </div>
+      {!collapsed && (
+      <div style={{ borderTop: "1px solid #f9731622", padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
@@ -788,6 +811,8 @@ function HotCard({ contact, onStatusChange, onSave }: {
           </span>
         )}
       </div>
+      </div>
+      )}
     </div>
     </>
   );
@@ -1347,6 +1372,7 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
   const [warmth, setWarmth] = useState(contact.warmth);
   const [followUpDate, setFollowUpDate] = useState(contact.followUpDate ?? "");
   const [saving, setSaving] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
   const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
@@ -1459,10 +1485,32 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
       />
     )}
     <div style={{
-      background: "#1a1a1a", borderRadius: 14, padding: 20,
+      background: "#1a1a1a", borderRadius: 14,
       border: "1px solid #10b98122",
       boxShadow: "0 4px 20px rgba(16,185,129,0.06)",
+      overflow: "hidden",
     }}>
+      {/* Collapsed Header */}
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.phone}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <WarmthBadge level={warmth} />
+          {followUpDate && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: new Date(followUpDate) < new Date(new Date().toDateString()) ? "#ef4444" : new Date(followUpDate).toDateString() === new Date().toDateString() ? "#facc15" : "#34d399" }}>
+              🗓 {new Date(followUpDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+          )}
+          <span style={{ fontSize: 16, color: "#10b981", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.2s", display: "inline-block" }}>›</span>
+        </div>
+      </div>
+      {!collapsed && (
+      <div style={{ borderTop: "1px solid #10b98122", padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
@@ -1707,6 +1755,8 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
           </>
         )}
       </div>
+      </div>
+      )}
     </div>
     </>
   );
