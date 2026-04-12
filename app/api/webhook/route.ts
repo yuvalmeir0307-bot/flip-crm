@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       phone = data?.data?.object?.from ?? data?.data?.from;
       content = data?.data?.object?.body ?? data?.data?.body ?? "";
       eventType = "SMS";
-    } else if (type === "call.completed" && (data?.data?.object?.direction === "incoming" || data?.data?.direction === "incoming")) {
+    } else if (type === "call.completed" && (data?.data?.object?.direction === "inbound" || data?.data?.direction === "inbound" || data?.data?.object?.direction === "incoming" || data?.data?.direction === "incoming")) {
       const duration = data?.data?.object?.duration ?? data?.data?.duration ?? 0;
       if (duration < 10) return NextResponse.json({ ok: true, reason: "missed_call" });
       phone = data?.data?.object?.from ?? data?.data?.from;

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 
 type PillarScore = { score: number; evidence: string };
@@ -1208,6 +1208,134 @@ function MAOSection({ contact, onSave }: {
   );
 }
 
+function FollowUpPicker({ value, onChange, editing, isOverdue, isToday }: {
+  value: string;
+  onChange: (v: string) => void;
+  editing: boolean;
+  isOverdue: boolean;
+  isToday: boolean;
+}) {
+  const [showCal, setShowCal] = useState(false);
+  const [calDate, setCalDate] = useState(() => value ? new Date(value + "T12:00:00") : new Date());
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShowCal(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const quickPick = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    onChange(fmt(d));
+    setCalDate(d);
+    setShowCal(false);
+  };
+
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = calDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const selectedDay = value ? new Date(value + "T12:00:00") : null;
+  const todayStr = fmt(new Date());
+
+  if (!editing) {
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+          Next Follow-Up
+        </div>
+        {value ? (
+          <span style={{ fontSize: 13, fontWeight: 600, color: isOverdue ? "#ef4444" : isToday ? "#facc15" : "#34d399" }}>
+            {isOverdue ? "⚠️ " : isToday ? "📅 " : "🗓 "}
+            {new Date(value + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            {isOverdue && " (overdue)"}
+            {isToday && " (today)"}
+          </span>
+        ) : (
+          <span style={{ fontSize: 13, color: "#555" }}>Not set</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 10, position: "relative" }} ref={ref}>
+      <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+        Next Follow-Up
+      </div>
+      {/* Quick chips */}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
+        {[{ label: "Tomorrow", days: 1 }, { label: "1 week", days: 7 }, { label: "10 days", days: 10 }, { label: "1 month", days: 30 }].map(({ label, days }) => (
+          <button key={label} onClick={() => quickPick(days)} style={{
+            fontSize: 11, padding: "3px 8px", borderRadius: 20, border: "1px solid #333",
+            background: "#1a1a1a", color: "#ccc", cursor: "pointer", fontWeight: 600,
+          }}>{label}</button>
+        ))}
+        <button onClick={() => setShowCal(v => !v)} style={{
+          fontSize: 11, padding: "3px 8px", borderRadius: 20, border: "1px solid #444",
+          background: showCal ? "#333" : "#1a1a1a", color: "#a78bfa", cursor: "pointer", fontWeight: 600,
+        }}>📅 Pick date</button>
+      </div>
+      {/* Selected date display */}
+      {value && (
+        <div style={{ fontSize: 12, color: "#34d399", marginBottom: 4 }}>
+          {new Date(value + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+          <button onClick={() => onChange("")} style={{ marginLeft: 6, background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 11 }}>✕</button>
+        </div>
+      )}
+      {/* Mini calendar */}
+      {showCal && (
+        <div style={{
+          position: "absolute", zIndex: 100, background: "#1a1a1a", border: "1px solid #333",
+          borderRadius: 10, padding: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.6)", top: "100%", left: 0, minWidth: 220,
+        }}>
+          {/* Month nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <button onClick={() => setCalDate(new Date(year, month - 1, 1))} style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", fontSize: 16, padding: "0 4px" }}>‹</button>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#ddd" }}>{monthName}</span>
+            <button onClick={() => setCalDate(new Date(year, month + 1, 1))} style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", fontSize: 16, padding: "0 4px" }}>›</button>
+          </div>
+          {/* Day headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+              <div key={d} style={{ fontSize: 10, color: "#555", textAlign: "center", fontWeight: 700 }}>{d}</div>
+            ))}
+          </div>
+          {/* Day cells */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+            {cells.map((day, i) => {
+              if (day === null) return <div key={i} />;
+              const thisStr = fmt(new Date(year, month, day));
+              const isSelected = selectedDay && fmt(selectedDay) === thisStr;
+              const isTodayCell = thisStr === todayStr;
+              return (
+                <button key={i} onClick={() => { onChange(thisStr); setShowCal(false); }} style={{
+                  fontSize: 11, padding: "4px 2px", borderRadius: 5, border: "none", cursor: "pointer",
+                  background: isSelected ? "#a78bfa" : isTodayCell ? "#2d2d3a" : "transparent",
+                  color: isSelected ? "#000" : isTodayCell ? "#a78bfa" : "#ccc",
+                  fontWeight: isSelected || isTodayCell ? 700 : 400,
+                }}>{day}</button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
   contact: Contact;
   onSave: (id: string, data: Partial<Contact>) => void;
@@ -1427,31 +1555,7 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
       )}
 
       {/* Follow Up Date */}
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-          Next Follow-Up
-        </div>
-        {editing ? (
-          <input
-            type="date"
-            value={followUpDate}
-            onChange={(e) => setFollowUpDate(e.target.value)}
-            style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, background: "#111", border: "1px solid #333", color: "#fff" }}
-          />
-        ) : followUpDate ? (
-          <span style={{
-            fontSize: 13, fontWeight: 600,
-            color: isOverdue ? "#ef4444" : isToday ? "#facc15" : "#34d399",
-          }}>
-            {isOverdue ? "⚠️ " : isToday ? "📅 " : "🗓 "}
-            {new Date(followUpDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-            {isOverdue && " (overdue)"}
-            {isToday && " (today)"}
-          </span>
-        ) : (
-          <span style={{ fontSize: 13, color: "#555" }}>Not set</span>
-        )}
-      </div>
+      <FollowUpPicker value={followUpDate} onChange={setFollowUpDate} editing={editing} isOverdue={!!isOverdue} isToday={!!isToday} />
 
       {/* Notes */}
       <div style={{ marginBottom: 14 }}>
