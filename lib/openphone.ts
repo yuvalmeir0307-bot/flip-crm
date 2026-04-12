@@ -31,7 +31,7 @@ export function getSenderByName(name: string): string {
 
 export async function alertBothPartners(message: string): Promise<void> {
   // Send from Yuval's line to both personal numbers
-  const sender = YUVAL;
+  const sender = YUVAL_ID;
   const targets = [YUVAL_PERSONAL, YAHAV_PERSONAL].filter(Boolean);
   for (const to of targets) {
     await sendSMS(to, message, sender);
