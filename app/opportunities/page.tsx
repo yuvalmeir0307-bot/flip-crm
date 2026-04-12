@@ -1882,6 +1882,7 @@ export default function OpportunitiesPage() {
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"opportunities" | "insights">("opportunities");
+  const [teamFilter, setTeamFilter] = useState<"All" | "Yahav" | "Yuval">("All");
 
   useEffect(() => { load(); }, []);
 
@@ -1924,8 +1925,9 @@ export default function OpportunitiesPage() {
     setContacts((prev) => prev.map((c) => c.id === id ? { ...c, ...data } : c));
   }
 
-  const hotContacts = contacts.filter((c) => c.status === "Replied");
-  const dealContacts = contacts.filter((c) => c.status === "Potential Deal");
+  const filteredByTeam = teamFilter === "All" ? contacts : contacts.filter((c) => c.assignedTo === teamFilter);
+  const hotContacts = filteredByTeam.filter((c) => c.status === "Replied");
+  const dealContacts = filteredByTeam.filter((c) => c.status === "Potential Deal");
 
   const TABS = [
     { key: "opportunities" as const, label: "Opportunities" },
@@ -1974,6 +1976,31 @@ export default function OpportunitiesPage() {
         ) : activeTab === "insights" ? (
           <InsightsPanel allContacts={allContacts} />
         ) : (
+          <>
+            {/* Team Member Filter */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}>Team:</span>
+              {(["All", "Yahav", "Yuval"] as const).map((member) => (
+                <button
+                  key={member}
+                  onClick={() => setTeamFilter(member)}
+                  style={{
+                    padding: "5px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 20,
+                    border: teamFilter === member ? "1px solid #111827" : "1px solid #e5e7eb",
+                    background: teamFilter === member ? "#111827" : "#fff",
+                    color: teamFilter === member ? "#fff" : "#6b7280",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {member}
+                </button>
+              ))}
+            </div>
+
           <div className="opportunities-columns">
 
             {/* Replied (from drip campaign) */}
@@ -2089,6 +2116,7 @@ export default function OpportunitiesPage() {
             </div>
 
           </div>
+          </>
         )}
       </div>
     </div>
