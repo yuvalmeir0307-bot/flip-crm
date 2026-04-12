@@ -7,6 +7,7 @@ type Contact = {
   id: string; name: string; phone: string; status: string;
   dripStep: number; poolStep: number; date: string | null;
   lastContact: string | null; lastReply: string; brokerage: string; area: string;
+  assignedTo?: string;
 };
 
 type AlertEntry = {
@@ -136,19 +137,35 @@ export default function Dashboard() {
 
   // Road to First Deal stats
   const DAILY_MSG_GOAL = 10;
-  const messagesSentToday = runLogs.filter(
-    (log) => log.status === "success" && log.date.startsWith(today)
-  ).length;
-  const msgGoalDone = messagesSentToday >= DAILY_MSG_GOAL;
-  const msgProgress = Math.min((messagesSentToday / DAILY_MSG_GOAL) * 100, 100);
 
-  const repliedToUs = contacts.filter(
-    (c) => c.status === "Replied" || c.status === "Replied - Pivot Call Needed - HOT"
+  // New Outreach = contacts first reached today (dripStep === 1 means they received exactly 1 message)
+  const newOutreachToday = contacts.filter(
+    (c) => c.lastContact?.startsWith(today) && c.dripStep === 1
   ).length;
+  const yahavOutreachToday = contacts.filter(
+    (c) => c.lastContact?.startsWith(today) && c.dripStep === 1 && c.assignedTo === "Yahav"
+  ).length;
+  const yuvalOutreachToday = contacts.filter(
+    (c) => c.lastContact?.startsWith(today) && c.dripStep === 1 && c.assignedTo === "Yuval"
+  ).length;
+
+  const msgGoalDone = newOutreachToday >= DAILY_MSG_GOAL;
+  const msgProgress = Math.min((newOutreachToday / DAILY_MSG_GOAL) * 100, 100);
+
+  const REPLIED_STATUSES = ["Replied", "Replied - Pivot Call Needed - HOT"];
+  const repliedToUs = contacts.filter((c) => REPLIED_STATUSES.includes(c.status)).length;
   const reachedBackToday = contacts.filter(
-    (c) =>
-      (c.status === "Replied" || c.status === "Replied - Pivot Call Needed - HOT") &&
-      c.lastContact?.startsWith(today)
+    (c) => REPLIED_STATUSES.includes(c.status) && c.lastContact?.startsWith(today)
+  ).length;
+
+  // Per-member reply stats
+  const yahavReplied = contacts.filter((c) => REPLIED_STATUSES.includes(c.status) && c.assignedTo === "Yahav").length;
+  const yuvalReplied = contacts.filter((c) => REPLIED_STATUSES.includes(c.status) && c.assignedTo === "Yuval").length;
+  const yahavReachedBack = contacts.filter(
+    (c) => REPLIED_STATUSES.includes(c.status) && c.assignedTo === "Yahav" && c.lastContact?.startsWith(today)
+  ).length;
+  const yuvalReachedBack = contacts.filter(
+    (c) => REPLIED_STATUSES.includes(c.status) && c.assignedTo === "Yuval" && c.lastContact?.startsWith(today)
   ).length;
 
   // Build 7-day rolling series from real contact dates
@@ -418,7 +435,7 @@ export default function Dashboard() {
           {/* Goals Row */}
           <div className="dashboard-goals-grid">
 
-            {/* Daily Goal: Send 10 Messages */}
+            {/* Daily Goal: New Outreach */}
             <div style={{
               background: msgGoalDone ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)",
               border: `1px solid ${msgGoalDone ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
@@ -428,10 +445,10 @@ export default function Dashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
                 <div>
                   <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
-                    Daily Goal
+                    Daily Goal — Team
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb" }}>
-                    Send 10 Messages
+                    New Outreach: 10 First Contacts
                   </div>
                 </div>
                 <div style={{
@@ -450,16 +467,16 @@ export default function Dashboard() {
                   fontSize: 56, fontWeight: 900, lineHeight: 1,
                   color: msgGoalDone ? "#22c55e" : "#ffffff",
                 }}>
-                  {messagesSentToday}
+                  {newOutreachToday}
                 </span>
                 <span style={{ fontSize: 20, color: "#4b5563", fontWeight: 600 }}>
                   / {DAILY_MSG_GOAL}
                 </span>
-                <span style={{ fontSize: 13, color: "#6b7280", marginLeft: 4 }}>sent today</span>
+                <span style={{ fontSize: 13, color: "#6b7280", marginLeft: 4 }}>new outreach today</span>
               </div>
 
               {/* Progress bar */}
-              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 6, overflow: "hidden" }}>
+              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 6, overflow: "hidden", marginBottom: 14 }}>
                 <div style={{
                   height: "100%", borderRadius: 99,
                   width: `${msgProgress}%`,
@@ -469,19 +486,42 @@ export default function Dashboard() {
                   transition: "width 0.6s ease",
                 }} />
               </div>
+
+              {/* Per-member breakdown */}
+              <div style={{ display: "flex", gap: 10 }}>
+                {[
+                  { name: "Yahav", count: yahavOutreachToday, color: "#00e5ff" },
+                  { name: "Yuval", count: yuvalOutreachToday, color: "#f97316" },
+                ].map(({ name, count, color }) => (
+                  <div key={name} style={{
+                    flex: 1,
+                    background: `${color}0d`,
+                    border: `1px solid ${color}22`,
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                  }}>
+                    <div style={{ fontSize: 10, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+                      {name}
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color, lineHeight: 1 }}>{count}</div>
+                    <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>new outreach</div>
+                  </div>
+                ))}
+              </div>
+
               {!msgGoalDone && (
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
-                  {DAILY_MSG_GOAL - messagesSentToday} more to hit the goal
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 10 }}>
+                  {DAILY_MSG_GOAL - newOutreachToday} more to hit the team goal
                 </div>
               )}
               {msgGoalDone && (
-                <div style={{ fontSize: 11, color: "#22c55e", marginTop: 8, fontWeight: 600 }}>
+                <div style={{ fontSize: 11, color: "#22c55e", marginTop: 10, fontWeight: 600 }}>
                   Goal crushed! Keep the momentum going.
                 </div>
               )}
             </div>
 
-            {/* Reply Back Goal */}
+            {/* Reply Pipeline */}
             <div style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.08)",
@@ -497,8 +537,9 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="kpi-grid-2" style={{ gap: 12 }}>
-                {/* Replied to us — click to open OpenPhone inbox */}
+              {/* Top row: totals */}
+              <div className="kpi-grid-2" style={{ gap: 12, marginBottom: 12 }}>
+                {/* Replied to us */}
                 <a
                   href="https://my.quo.com/inbox/PNpvAhCQ3j/c/CN7d1304260ddf4114a378ede6b6a29c79"
                   target="_blank"
@@ -548,9 +589,40 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Per-member reply breakdown */}
+              <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                {[
+                  { name: "Yahav", replied: yahavReplied, reached: yahavReachedBack, color: "#00e5ff" },
+                  { name: "Yuval", replied: yuvalReplied, reached: yuvalReachedBack, color: "#f97316" },
+                ].map(({ name, replied: r, reached, color }) => (
+                  <div key={name} style={{
+                    flex: 1,
+                    background: `${color}08`,
+                    border: `1px solid ${color}1a`,
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                  }}>
+                    <div style={{ fontSize: 10, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                      {name}
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: r > 0 ? "#fbbf24" : "#374151", lineHeight: 1 }}>{r}</div>
+                        <div style={{ fontSize: 9, color: "#555", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>replied</div>
+                      </div>
+                      <div style={{ width: 1, background: "#222", alignSelf: "stretch" }} />
+                      <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: reached > 0 ? "#818cf8" : "#374151", lineHeight: 1 }}>{reached}</div>
+                        <div style={{ fontSize: 9, color: "#555", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>reached back</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               {repliedToUs > 0 && reachedBackToday < repliedToUs && (
                 <div style={{
-                  marginTop: 12, padding: "8px 12px", borderRadius: 8,
+                  padding: "8px 12px", borderRadius: 8,
                   background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.15)",
                   fontSize: 12, color: "#d97706", fontWeight: 600,
                 }}>
@@ -559,7 +631,7 @@ export default function Dashboard() {
               )}
               {repliedToUs > 0 && reachedBackToday >= repliedToUs && (
                 <div style={{
-                  marginTop: 12, padding: "8px 12px", borderRadius: 8,
+                  padding: "8px 12px", borderRadius: 8,
                   background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)",
                   fontSize: 12, color: "#22c55e", fontWeight: 600,
                 }}>
