@@ -290,6 +290,7 @@ export function extractContactProps(page: Record<string, unknown>) {
     followUpDate: props["Follow Up Date"]?.date?.start ?? null,
     assignedTo: props["Assigned To"]?.rich_text?.[0]?.plain_text ?? "",
     altPhones: props["Alt Phones"]?.rich_text?.[0]?.plain_text ?? "",
+    repliedAtStep: props["Replied At Step"]?.rich_text?.[0]?.plain_text ?? "",
     arv: props["ARV"]?.number ?? undefined,
     rehabCost: props["Rehab Cost"]?.number ?? undefined,
     monthlyRent: props["Monthly Rent"]?.number ?? undefined,

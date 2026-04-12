@@ -51,6 +51,14 @@ export async function POST(req: NextRequest) {
       "Last Contact": { date: { start: new Date().toISOString() } },
     };
 
+    // Record which drip/pool step the agent was on when they replied (for insights graph)
+    if (contact.status === "Drip Active" || contact.status === "The Pool") {
+      const repliedAtStep = contact.status === "The Pool"
+        ? `pool:${contact.poolStep}`
+        : `drip:${Math.max(contact.dripStep - 1, 0)}`;
+      updateProps["Replied At Step"] = { rich_text: [{ text: { content: repliedAtStep } }] };
+    }
+
     // Classify & change status for Drip Active / The Pool contacts
     let poolAutoReply: string | null = null;
 

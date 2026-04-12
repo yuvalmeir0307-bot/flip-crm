@@ -10,6 +10,7 @@ type Contact = {
   lastReply: string;
   lastContact: string | null;
   assignedTo?: string;
+  repliedAtStep?: string;
 };
 
 type Period = "day" | "week" | "month" | "quarter" | "year" | "all";
@@ -341,15 +342,19 @@ export default function Insights() {
 
   const contacted = filtered.filter((c) => c.dripStep > 0 || c.poolStep > 0).length;
 
-  // Reply stage breakdown
+  // Reply stage breakdown — uses repliedAtStep (recorded at reply time) when available,
+  // falls back to current dripStep/poolStep for contacts that replied before tracking was added
   const repliedContacts = filtered.filter(isReplied);
   const stageData = STAGE_META.map((meta, i) => {
-    const count =
-      i < 5
-        ? repliedContacts.filter(
-            (c) => c.dripStep === i + 1 && c.poolStep === 0
-          ).length
-        : repliedContacts.filter((c) => c.poolStep > 0).length;
+    const count = repliedContacts.filter((c) => {
+      if (c.repliedAtStep) {
+        if (i < 5) return c.repliedAtStep === `drip:${i}`;
+        return c.repliedAtStep.startsWith("pool:");
+      }
+      // Fallback for contacts without repliedAtStep
+      if (i < 5) return c.dripStep === i + 1 && c.poolStep === 0;
+      return c.poolStep > 0;
+    }).length;
     return { label: meta.label, desc: meta.desc, value: count, color: meta.color };
   });
 
