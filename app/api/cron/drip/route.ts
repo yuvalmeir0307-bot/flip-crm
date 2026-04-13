@@ -7,6 +7,7 @@ import {
   calculateNextDate,
 } from "@/lib/drip";
 import { getAllScripts, resolveMessage, ScriptEntry } from "@/lib/scripts";
+import { runGuard } from "@/lib/send-guard";
 
 export async function GET(req: NextRequest) {
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
@@ -91,6 +92,13 @@ export async function GET(req: NextRequest) {
 
     logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
     logs.push(`Message: "${message}"`);
+
+    // Run send guard
+    const guard = runGuard(message, contact.lastContact);
+    if (!guard.ok) {
+      logs.push(`⛔ ${contact.name} — ${guard.reason}`);
+      continue;
+    }
 
     if (dryRun) {
       logs.push(`Would update: step → ${isPool ? "Pool " + (currentStep >= 9 ? 1 : currentStep + 1) : currentStep >= 4 ? "Drip 0 (restart in 60 days)" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);

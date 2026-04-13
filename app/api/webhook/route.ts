@@ -5,6 +5,7 @@ import { STATUS_NO_DEAL, STATUS_REPLIED, STATUS_POTENTIAL_DEAL, getPoolNeutralRe
 import { sendSMS, getSenderByName, getSender } from "@/lib/openphone";
 import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 import { createLog } from "@/lib/logs";
+import { runGuard } from "@/lib/send-guard";
 
 const STOP_KEYWORDS = ["stop", "unsubscribe", "remove me", "opt out", "optout"];
 
@@ -108,11 +109,14 @@ export async function POST(req: NextRequest) {
     // Send polite auto-reply for non-HOT pool responses
     if (poolAutoReply) {
       try {
-        const senderPhone = contact.assignedTo
-          ? getSenderByName(contact.assignedTo)
-          : getSender(0);
-        await sendSMS(contact.phone, poolAutoReply, senderPhone);
-        console.log("[webhook] pool auto-reply sent to:", contact.name);
+        const guard = runGuard(poolAutoReply, contact.lastContact);
+        if (!guard.ok) {
+          console.log("[webhook] auto-reply blocked:", guard.reason);
+        } else {
+          const senderPhone = contact.assignedTo ? getSenderByName(contact.assignedTo) : getSender(0);
+          await sendSMS(contact.phone, poolAutoReply, senderPhone);
+          console.log("[webhook] pool auto-reply sent to:", contact.name);
+        }
       } catch (e) {
         console.error("[webhook] pool auto-reply failed:", e);
       }
