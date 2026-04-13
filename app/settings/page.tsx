@@ -29,10 +29,31 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
   BROKEN_NAME: "#f97316",
   FAILED_SMS: "#ef4444",
   STOP: "#a855f7",
+  BLOCKED: "#f97316",
   DAILY_REPORT: "#22c55e",
   SMS_SENT: "#00e5ff",
   INFO: "#6b7280",
 };
+
+// ── Alert helpers ────────────────────────────────────────────────────────────
+function getBlockReason(details: string): string {
+  if (details.includes("Outside send window")) {
+    const match = details.match(/Israel time is (\d+:\d+)/);
+    return match ? `שליחה בשעה ${match[1]} ישראל (מחוץ ל-09:00–18:00)` : "שליחה מחוץ לשעות מורשות";
+  }
+  if (details.includes("Already contacted today")) return "קונטקט כבר קיבל הודעה היום";
+  if (details.includes("empty or too short")) return "סקריפט חסר ב-Notion לשלב הזה";
+  if (details.includes("Script not from Notion")) return "סקריפט hardcoded — נחסם בכוונה";
+  return details.split("|").pop()?.trim() || details;
+}
+
+function getBlockFix(details: string): string {
+  if (details.includes("Outside send window")) return "בדוק vercel.json — הכרון רץ בשעה לא נכונה";
+  if (details.includes("Already contacted today")) return "תקין — ממתין ליום הבא";
+  if (details.includes("empty or too short")) return "הוסף סקריפט ב-Notion Scripts עבור השלב הזה";
+  if (details.includes("Script not from Notion")) return "כתוב סקריפט ב-Notion Scripts DB";
+  return "בדוק את הלוגים לפרטים";
+}
 
 // ── Flow Node ────────────────────────────────────────────────────────────────
 function FlowNode({ label, sub, color, active, last, onClick, count }: {
@@ -610,7 +631,7 @@ export default function SettingsPage() {
                     <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden" }}>
                       <div className="table-scroll">
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                        <thead><tr>{["Type","Title","Phone","Details","Time",""].map((h) => (
+                        <thead><tr>{["Type","Contact","Phone","Reason","Fix","Time",""].map((h) => (
                           <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                         ))}</tr></thead>
                         <tbody>{alerts.map((a, i) => (
@@ -618,9 +639,16 @@ export default function SettingsPage() {
                             <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
                               <span style={{ background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22", color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700 }}>{a.type}</span>
                             </td>
-                            <td style={{ padding: "9px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{a.title}</td>
+                            <td style={{ padding: "9px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500, whiteSpace: "nowrap" }}>{a.title.replace("⛔ Blocked: ", "").replace("⛔ Auto-reply blocked: ", "") || "--"}</td>
                             <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{a.phone || "--"}</td>
-                            <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.details || "--"}</td>
+                            <td style={{ padding: "9px 14px", color: "#f97316", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 200 }}>
+                              {a.type === "BLOCKED" ? getBlockReason(a.details) : (a.details || "--")}
+                            </td>
+                            <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 200 }}>
+                              {a.type === "BLOCKED"
+                                ? <span style={{ color: "#22c55e" }}>{getBlockFix(a.details)}</span>
+                                : <span style={{ color: "#6b7280" }}>--</span>}
+                            </td>
                             <td style={{ padding: "9px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", whiteSpace: "nowrap", fontSize: 11 }}>{a.createdAt ? new Date(a.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "--"}</td>
                             <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
                               <button onClick={() => resolveAlert(a.id)} style={{ background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Resolve</button>
