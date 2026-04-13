@@ -472,7 +472,7 @@ function ScriptPanel({ title, accentColor, children }: { title: string; accentCo
 
 type ScriptLine =
   | { type: "pause"; text?: never }
-  | { type: "line" | "bold" | "bracket"; text: string };
+  | { type: "line" | "bold" | "bracket" | "section" | "switch"; text: string };
 
 type DiscoveryStep = {
   num: number;
@@ -482,7 +482,7 @@ type DiscoveryStep = {
 };
 
 const HOT_SCRIPT_LINES: ScriptLine[] = [
-  { type: "line", text: 'Hi [Agent name], this is [Your name] with HBI Realty. How you doing?' },
+  { type: "line", text: 'Hi [Agent name], this is [Your name]. How you doing?' },
   { type: "pause" },
   { type: "bold", text: "Awesome. I'm contacting you because me and my partner are looking to buy another investment property in the [market] area. Is this something you can help with?" },
   { type: "pause" },
@@ -499,6 +499,16 @@ const HOT_SCRIPT_LINES: ScriptLine[] = [
   { type: "bracket", text: 'If agent said they have a property coming up' },
   { type: "bold", text: "Great. Can you catch me up to speed with the seller situation on this property?" },
   { type: "line", text: "What's the property address?" },
+  { type: "switch", text: "Switch to the Discovery Script" },
+  { type: "section", text: "Relationship Building" },
+  { type: "bold", text: "1. Values — Win-Win & Long-Term Relationship" },
+  { type: "line", text: "Before we wrap up — I want to be transparent about how we like to do business. We're not here for a one-time deal. We're actively buying multiple properties and we're looking to build a real long-term relationship with the right agent. Everything we do is built around a win-win." },
+  { type: "pause" },
+  { type: "bold", text: "2. Commission — We Pay Both Sides" },
+  { type: "line", text: "On our deals, we offer to cover both sides of the commission — so you'd be representing us as the buyer AND collecting the listing side as well. We typically pay 6% total, and depending on the deal we can go up to 10% if it's a great opportunity for us." },
+  { type: "pause" },
+  { type: "bold", text: "Does that work for you? Is that something you'd be comfortable with?" },
+  { type: "bracket", text: 'Wait for response — confirm agreement before moving forward' },
 ];
 
 const DISCOVERY_STEPS: DiscoveryStep[] = [
@@ -2086,6 +2096,22 @@ export default function OpportunitiesPage() {
                     );
                     if (line.type === "bold") return (
                       <div key={i} style={{ color: "#fff", fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>{line.text}</div>
+                    );
+                    if (line.type === "switch") return (
+                      <div key={i} style={{
+                        color: "#fff", fontSize: 13, fontWeight: 700, textAlign: "center",
+                        background: "#1d4ed8", borderRadius: 8, padding: "8px 14px", marginTop: 4,
+                      }}>
+                        ➜ {line.text}
+                      </div>
+                    );
+                    if (line.type === "section") return (
+                      <div key={i} style={{
+                        color: "#f97316", fontSize: 13, fontWeight: 700, textTransform: "uppercase",
+                        letterSpacing: "0.08em", borderTop: "1px solid #333", marginTop: 8, paddingTop: 10,
+                      }}>
+                        {line.text}
+                      </div>
                     );
                     return (
                       <div key={i} style={{ color: "#aaa", fontSize: 13, lineHeight: 1.5 }}>{line.text}</div>
