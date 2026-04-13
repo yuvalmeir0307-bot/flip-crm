@@ -123,9 +123,11 @@ export async function GET(req: NextRequest) {
         updateProps["Pool step"] = { number: nextStep };
       } else {
         if (currentStep >= 4) {
-          // Non-responder — restart cold drip after 60-day pause (Hieu steps 6-10)
-          // Date is already set to +60 days above via getDripDelay(4)
-          updateProps["Drip step"] = { number: 0 };
+          // Drip complete — graduate to Pool
+          updateProps["Status"] = { select: { name: "The Pool" } };
+          updateProps["Pool step"] = { number: 1 };
+          // Override date to Pool step 1 delay (7 days)
+          updateProps["Date"] = { date: { start: calculateNextDate(7) } };
         } else {
           updateProps["Drip step"] = { number: currentStep + 1 };
         }

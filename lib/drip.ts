@@ -18,7 +18,9 @@ export function getPoolNoDealReply(name: string): string {
 
 // Hieu timing: 5 days total (1 message per day), then 60-day pause via Pool
 export function getDripDelay(step: number): number {
-  const delays: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 1, 4: 60 };
+  // After sending step N, how many days until the next message
+  // Step 0 → next day (NOT 0 — delay=0 caused step 1 to fire same day as step 0)
+  const delays: Record<number, number> = { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 };
   return delays[step] ?? 1;
 }
 
