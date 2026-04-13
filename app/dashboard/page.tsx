@@ -75,6 +75,21 @@ export default function Dashboard() {
   const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
   const [runLogs, setRunLogs] = useState<RunLog[]>([]);
 
+  const DEFAULT_GOALS = {
+    yuval: [
+      "שהאוטומציה של הדריפ והפול תעבוד חלק",
+      "סיסטם בקרה — סוכן שבודק פעם ביום ומדווח שהאוטומציה עובדת",
+    ],
+    yahav: [
+      "לבנות את הממשק לפי התהליך של ה-SOP — כמה שיותר חלק ופשוט",
+    ],
+    nextStep: "להריץ את הדריפ הראשון end-to-end ולוודא שהכל עובד",
+  };
+
+  const [weeklyGoals, setWeeklyGoals] = useState(DEFAULT_GOALS);
+  const [editingGoals, setEditingGoals] = useState(false);
+  const [goalsInput, setGoalsInput] = useState(DEFAULT_GOALS);
+
   useEffect(() => {
     fetch("/api/contacts").then((r) => r.json()).then((data) => {
       setContacts(data);
@@ -86,6 +101,15 @@ export default function Dashboard() {
     fetch("/api/runs").then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setRunLogs(data);
     }).catch(() => { /* silent */ });
+
+    try {
+      const saved = localStorage.getItem("flipcrm_weekly_goals");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setWeeklyGoals(parsed);
+        setGoalsInput(parsed);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   async function grabAgents(person: "Yahav" | "Yuval") {
@@ -639,6 +663,176 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* ── This Week's Goals ── */}
+        <div style={{
+          background: "#111118",
+          border: "1px solid #2a2a3e",
+          borderRadius: 20,
+          padding: "28px 32px",
+          marginBottom: 24,
+          position: "relative",
+        }}>
+          {/* Header row */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>
+                THIS WEEK&apos;S FOCUS
+              </div>
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#e5e7eb" }}>Main Goals &amp; Next Step</h3>
+            </div>
+            <button
+              onClick={() => {
+                if (editingGoals) {
+                  setWeeklyGoals(goalsInput);
+                  localStorage.setItem("flipcrm_weekly_goals", JSON.stringify(goalsInput));
+                } else {
+                  setGoalsInput(weeklyGoals);
+                }
+                setEditingGoals((v) => !v);
+              }}
+              style={{
+                background: editingGoals ? "#22c55e18" : "#6366f118",
+                border: `1px solid ${editingGoals ? "#22c55e44" : "#6366f144"}`,
+                color: editingGoals ? "#22c55e" : "#818cf8",
+                borderRadius: 10, padding: "8px 18px",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              {editingGoals ? "Save Goals" : "Edit Goals"}
+            </button>
+          </div>
+
+          {/* Two columns: Yuval + Yahav */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            {/* Yuval */}
+            <div style={{
+              background: "#0f0f1a", border: "1px solid #1e1e38",
+              borderRadius: 14, padding: "20px 22px",
+            }}>
+              <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
+                Yuval
+              </div>
+              {editingGoals ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {goalsInput.yuval.map((g, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8 }}>
+                      <textarea
+                        value={g}
+                        onChange={(e) => {
+                          const next = [...goalsInput.yuval];
+                          next[i] = e.target.value;
+                          setGoalsInput((prev) => ({ ...prev, yuval: next }));
+                        }}
+                        style={{
+                          flex: 1, background: "#1a1a2e", border: "1px solid #2a2a4e",
+                          borderRadius: 8, color: "#e5e7eb", fontSize: 13, padding: "8px 10px",
+                          resize: "vertical", fontFamily: "inherit", minHeight: 54,
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          const next = goalsInput.yuval.filter((_, j) => j !== i);
+                          setGoalsInput((prev) => ({ ...prev, yuval: next }));
+                        }}
+                        style={{ background: "none", border: "none", color: "#555", fontSize: 16, cursor: "pointer", alignSelf: "flex-start", padding: 4 }}
+                      >✕</button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setGoalsInput((prev) => ({ ...prev, yuval: [...prev.yuval, ""] }))}
+                    style={{ background: "#6366f118", border: "1px dashed #6366f144", color: "#818cf8", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                  >+ Add Goal</button>
+                </div>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {weeklyGoals.yuval.map((g, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#a78bfa22", border: "1px solid #a78bfa44", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, color: "#a78bfa", fontWeight: 700, marginTop: 1 }}>{i + 1}</span>
+                      <span style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.5 }}>{g}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Yahav */}
+            <div style={{
+              background: "#0f0f1a", border: "1px solid #1e1e38",
+              borderRadius: 14, padding: "20px 22px",
+            }}>
+              <div style={{ fontSize: 11, color: "#00e5ff", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
+                Yahav
+              </div>
+              {editingGoals ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {goalsInput.yahav.map((g, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8 }}>
+                      <textarea
+                        value={g}
+                        onChange={(e) => {
+                          const next = [...goalsInput.yahav];
+                          next[i] = e.target.value;
+                          setGoalsInput((prev) => ({ ...prev, yahav: next }));
+                        }}
+                        style={{
+                          flex: 1, background: "#1a1a2e", border: "1px solid #2a2a4e",
+                          borderRadius: 8, color: "#e5e7eb", fontSize: 13, padding: "8px 10px",
+                          resize: "vertical", fontFamily: "inherit", minHeight: 54,
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          const next = goalsInput.yahav.filter((_, j) => j !== i);
+                          setGoalsInput((prev) => ({ ...prev, yahav: next }));
+                        }}
+                        style={{ background: "none", border: "none", color: "#555", fontSize: 16, cursor: "pointer", alignSelf: "flex-start", padding: 4 }}
+                      >✕</button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setGoalsInput((prev) => ({ ...prev, yahav: [...prev.yahav, ""] }))}
+                    style={{ background: "#00e5ff18", border: "1px dashed #00e5ff44", color: "#00e5ff", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                  >+ Add Goal</button>
+                </div>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {weeklyGoals.yahav.map((g, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#00e5ff22", border: "1px solid #00e5ff44", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, color: "#00e5ff", fontWeight: 700, marginTop: 1 }}>{i + 1}</span>
+                      <span style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.5 }}>{g}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Next Step */}
+          <div style={{
+            background: "linear-gradient(90deg, #6366f108 0%, #00e5ff08 100%)",
+            border: "1px solid #2a2a4e", borderRadius: 12, padding: "16px 20px",
+            display: "flex", alignItems: "flex-start", gap: 14,
+          }}>
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Next Step</div>
+              <div style={{ width: 32, height: 2, background: "linear-gradient(90deg, #6366f1, #00e5ff)", borderRadius: 99 }} />
+            </div>
+            {editingGoals ? (
+              <textarea
+                value={goalsInput.nextStep}
+                onChange={(e) => setGoalsInput((prev) => ({ ...prev, nextStep: e.target.value }))}
+                style={{
+                  flex: 1, background: "#1a1a2e", border: "1px solid #2a2a4e",
+                  borderRadius: 8, color: "#e5e7eb", fontSize: 14, padding: "8px 12px",
+                  resize: "vertical", fontFamily: "inherit", minHeight: 44,
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: 15, color: "#e5e7eb", fontWeight: 600, lineHeight: 1.5 }}>{weeklyGoals.nextStep}</span>
+            )}
           </div>
         </div>
 
