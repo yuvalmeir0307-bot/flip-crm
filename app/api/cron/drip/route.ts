@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveContacts, updateContact, extractContactProps, createRunLog } from "@/lib/notion";
 import { sendSMS, getSender, getSenderName, getSenderByName } from "@/lib/openphone";
 import {
-  getDripScript,
-  getPoolScript,
   getDripDelay,
   getPoolDelay,
   calculateNextDate,
@@ -25,12 +23,12 @@ export async function GET(req: NextRequest) {
   const dryRun = url.searchParams.get("dryRun") === "true"; // ?dryRun=true
   const firstOnly = url.searchParams.get("firstOnly") === "true"; // ?firstOnly=true → only Step 0
 
-  // Load scripts from Notion (fallback to hardcoded if unavailable)
+  // Load scripts from Notion — required, no hardcoded fallback
   let notionScripts: ScriptEntry[] = [];
   try {
     notionScripts = await getAllScripts();
   } catch {
-    // Will use hardcoded fallback
+    // Scripts DB unavailable — all contacts will be skipped this run
   }
 
   const pages = await getActiveContacts();
@@ -79,19 +77,15 @@ export async function GET(req: NextRequest) {
     const senderName = knownAgent ? (isYuval ? "Yuval" : "Yahav") : (phoneLastDigit % 2 === 0 ? "Yuval" : "Yahav");
     const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(phoneLastDigit % 2);
 
-    // Try to get script from Notion, fallback to hardcoded
-    let message: string;
     const notionScript = notionScripts.find(
       (s) => s.campaign === (isPool ? "Pool" : "Drip") && s.step === currentStep
     );
 
-    if (notionScript) {
-      message = resolveMessage(notionScript.message, firstName, senderName);
-    } else {
-      message = isPool
-        ? getPoolScript(currentStep, firstName)
-        : getDripScript(currentStep, firstName, senderName);
+    if (!notionScript) {
+      logs.push(`Skipping ${contact.name} - no script in Notion for ${isPool ? "Pool" : "Drip"} step ${currentStep}`);
+      continue;
     }
+    const message = resolveMessage(notionScript.message, firstName, senderName);
 
     const delay = isPool ? getPoolDelay(currentStep) : getDripDelay(currentStep);
 
