@@ -644,8 +644,8 @@ export default function SettingsPage() {
                               </td>
                               <td style={{ padding: "9px 14px", color: "#d1d5db", fontWeight: 500 }}>{d.contact}</td>
                               <td style={{ padding: "9px 14px", color: "#9ca3af", fontFamily: "monospace", fontSize: 11 }}>{d.phone}</td>
-                              <td style={{ padding: "9px 14px", color: "#fb923c", fontSize: 12 }}>{d.reason}</td>
-                              <td style={{ padding: "9px 14px", color: "#4ade80", fontSize: 12 }}>{d.fix}</td>
+                              <td style={{ padding: "9px 14px", color: "#fb923c", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.reason}>{d.reason}</td>
+                              <td style={{ padding: "9px 14px", color: "#4ade80", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.fix}>{d.fix}</td>
                               <td style={{ padding: "9px 14px", color: "#6b7280", fontSize: 11, whiteSpace: "nowrap" }}>{d.time}</td>
                               <td style={{ padding: "9px 14px" }}><span style={{ color: "#6b7280", fontSize: 11, fontStyle: "italic" }}>—</span></td>
                             </tr>
@@ -671,10 +671,10 @@ export default function SettingsPage() {
                             </td>
                             <td style={{ padding: "9px 14px", color: "#d1d5db", borderBottom: "1px solid #1e1e1e", fontWeight: 500, whiteSpace: "nowrap" }}>{a.title.replace("⛔ Blocked: ", "").replace("⛔ Auto-reply blocked: ", "") || "--"}</td>
                             <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{a.phone || "--"}</td>
-                            <td style={{ padding: "9px 14px", color: "#f97316", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 200 }}>
+                            <td style={{ padding: "9px 14px", color: "#f97316", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.type === "BLOCKED" ? getBlockReason(a.details) : a.details}>
                               {a.type === "BLOCKED" ? getBlockReason(a.details) : (a.details || "--")}
                             </td>
-                            <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 200 }}>
+                            <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.type === "BLOCKED" ? getBlockFix(a.details) : ""}>
                               {a.type === "BLOCKED"
                                 ? <span style={{ color: "#22c55e" }}>{getBlockFix(a.details)}</span>
                                 : <span style={{ color: "#6b7280" }}>--</span>}
