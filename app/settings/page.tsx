@@ -621,20 +621,25 @@ export default function SettingsPage() {
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>System Alerts</h3>
                   {alerts.length > 0 && <span style={{ background: "#ef444422", color: "#ef4444", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 99 }}>{alerts.length} open</span>}
                 </div>
-                {logsLoading ? <p style={{ color: "#6b7280", fontSize: 13 }}>Loading...</p>
-                  : alerts.length === 0 ? (
-                    <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} />
-                      <span style={{ color: "#6b7280", fontSize: 13 }}>No open alerts</span>
-                    </div>
-                  ) : (
+                {logsLoading ? <p style={{ color: "#6b7280", fontSize: 13 }}>Loading...</p> : (
                     <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden" }}>
                       <div className="table-scroll">
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                         <thead><tr>{["Type","Contact","Phone","Reason","Fix","Time",""].map((h) => (
                           <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                         ))}</tr></thead>
-                        <tbody>{alerts.map((a, i) => (
+                        <tbody>
+                          {alerts.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ padding: "20px 14px", textAlign: "center" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} />
+                                  <span style={{ color: "#22c55e", fontSize: 13, fontWeight: 500 }}>Guard active — no blocked sends</span>
+                                </div>
+                                <div style={{ color: "#4b5563", fontSize: 11, marginTop: 6 }}>חסימות יופיעו כאן עם סיבה ופתרון מוצע</div>
+                              </td>
+                            </tr>
+                          ) : alerts.map((a, i) => (
                           <tr key={a.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
                             <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
                               <span style={{ background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22", color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700 }}>{a.type}</span>
@@ -654,7 +659,8 @@ export default function SettingsPage() {
                               <button onClick={() => resolveAlert(a.id)} style={{ background: "#22c55e22", color: "#22c55e", border: "1px solid #22c55e44", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Resolve</button>
                             </td>
                           </tr>
-                        ))}</tbody>
+                          ))}
+                        </tbody>
                       </table>
                       </div>
                     </div>
