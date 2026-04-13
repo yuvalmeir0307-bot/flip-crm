@@ -630,26 +630,24 @@ export default function SettingsPage() {
                         ))}</tr></thead>
                         <tbody>
                           {/* ── DEMO ROWS (example only) ── */}
-                          {[
-                            { type: "BLOCKED", contact: "John Smith", phone: "+14141234567", reason: "שליחה בשעה 20:05 ישראל (מחוץ ל-09:00–18:00)", fix: "בדוק vercel.json — הכרון רץ בשעה לא נכונה", time: "Apr 13 20:05" },
-                            { type: "BLOCKED", contact: "Sara Lee",   phone: "+14142345678", reason: "קונטקט כבר קיבל הודעה היום",                   fix: "תקין — ממתין ליום הבא",                          time: "Apr 13 10:13" },
-                            { type: "BLOCKED", contact: "Mike B.",    phone: "+14143456789", reason: "סקריפט חסר ב-Notion לשלב הזה",                 fix: "הוסף סקריפט ב-Notion Scripts עבור השלב הזה",  time: "Apr 13 10:21" },
-                          ].map((d, i) => (
-                            <tr key={`demo-${i}`} style={{ background: i % 2 === 0 ? "#1a0000" : "#150000", opacity: 0.75 }}>
-                              <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                  <span style={{ background: "#f9731622", color: "#f97316", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700, width: "fit-content" }}>{d.type}</span>
-                                  <span style={{ color: "#ef4444", fontSize: 9, fontWeight: 800, letterSpacing: "0.1em" }}>דוגמה</span>
+                          {([
+                            { contact: "John Smith", phone: "+14141234567", reason: "שליחה בשעה 20:05 ישראל (מחוץ ל-09:00–18:00)", fix: "בדוק vercel.json — הכרון רץ בשעה לא נכונה", time: "Apr 13 20:05" },
+                            { contact: "Sara Lee",   phone: "+14142345678", reason: "קונטקט כבר קיבל הודעה היום",                   fix: "תקין — ממתין ליום הבא",                         time: "Apr 13 10:13" },
+                            { contact: "Mike B.",    phone: "+14143456789", reason: "סקריפט חסר ב-Notion לשלב הזה",                 fix: "הוסף סקריפט ב-Notion Scripts עבור השלב הזה", time: "Apr 13 10:21" },
+                          ] as { contact: string; phone: string; reason: string; fix: string; time: string }[]).map((d, i) => (
+                            <tr key={`demo-${i}`} style={{ background: "#1c1008", borderBottom: "1px solid #2a1f0a" }}>
+                              <td style={{ padding: "9px 14px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  <span style={{ background: "#f9731630", color: "#f97316", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700, display: "inline-block" }}>BLOCKED</span>
+                                  <span style={{ color: "#ef4444", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" }}>דוגמה</span>
                                 </div>
                               </td>
-                              <td style={{ padding: "9px 14px", color: "#9ca3af", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{d.contact}</td>
-                              <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{d.phone}</td>
-                              <td style={{ padding: "9px 14px", color: "#f97316", borderBottom: "1px solid #1e1e1e", fontSize: 12 }}>{d.reason}</td>
-                              <td style={{ padding: "9px 14px", color: "#22c55e", borderBottom: "1px solid #1e1e1e", fontSize: 12 }}>{d.fix}</td>
-                              <td style={{ padding: "9px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", fontSize: 11 }}>{d.time}</td>
-                              <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
-                                <span style={{ color: "#4b5563", fontSize: 11, fontStyle: "italic" }}>demo</span>
-                              </td>
+                              <td style={{ padding: "9px 14px", color: "#d1d5db", fontWeight: 500 }}>{d.contact}</td>
+                              <td style={{ padding: "9px 14px", color: "#9ca3af", fontFamily: "monospace", fontSize: 11 }}>{d.phone}</td>
+                              <td style={{ padding: "9px 14px", color: "#fb923c", fontSize: 12 }}>{d.reason}</td>
+                              <td style={{ padding: "9px 14px", color: "#4ade80", fontSize: 12 }}>{d.fix}</td>
+                              <td style={{ padding: "9px 14px", color: "#6b7280", fontSize: 11, whiteSpace: "nowrap" }}>{d.time}</td>
+                              <td style={{ padding: "9px 14px" }}><span style={{ color: "#6b7280", fontSize: 11, fontStyle: "italic" }}>—</span></td>
                             </tr>
                           ))}
                           {/* ── divider ── */}
