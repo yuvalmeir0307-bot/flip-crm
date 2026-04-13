@@ -8,6 +8,7 @@ import {
 } from "@/lib/drip";
 import { getAllScripts, resolveMessage, ScriptEntry } from "@/lib/scripts";
 import { runGuard } from "@/lib/send-guard";
+import { createLog } from "@/lib/logs";
 
 export async function GET(req: NextRequest) {
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
@@ -93,10 +94,18 @@ export async function GET(req: NextRequest) {
     logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
     logs.push(`Message: "${message}"`);
 
-    // Run send guard
+    // Run send guard — blocks wrong-hour sends, empty scripts, double-sends
     const guard = runGuard(message, contact.lastContact);
     if (!guard.ok) {
       logs.push(`⛔ ${contact.name} — ${guard.reason}`);
+      if (!dryRun) {
+        await createLog(
+          `⛔ Blocked: ${contact.name}`,
+          "BLOCKED",
+          contact.phone,
+          `Step: ${isPool ? "Pool " + currentStep : "Drip " + currentStep} | ${guard.reason}`
+        ).catch(() => {});
+      }
       continue;
     }
 

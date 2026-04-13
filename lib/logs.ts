@@ -8,8 +8,10 @@ export type LogType =
   | "BROKEN_NAME"
   | "FAILED_SMS"
   | "STOP"
+  | "BLOCKED"
   | "DAILY_REPORT"
   | "SMS_SENT"
+  | "DRIP_TRIGGER"
   | "INFO";
 
 export type LogEntry = {
@@ -81,6 +83,7 @@ export async function getActiveAlerts(): Promise<LogEntry[]> {
               { property: "Type", select: { equals: "BROKEN_NAME" } },
               { property: "Type", select: { equals: "FAILED_SMS" } },
               { property: "Type", select: { equals: "STOP" } },
+              { property: "Type", select: { equals: "BLOCKED" } },
             ],
           },
         ],

@@ -112,6 +112,12 @@ export async function POST(req: NextRequest) {
         const guard = runGuard(poolAutoReply, contact.lastContact);
         if (!guard.ok) {
           console.log("[webhook] auto-reply blocked:", guard.reason);
+          await createLog(
+            `⛔ Auto-reply blocked: ${contact.name}`,
+            "BLOCKED",
+            contact.phone,
+            `Pool auto-reply | ${guard.reason}`
+          ).catch(() => {});
         } else {
           const senderPhone = contact.assignedTo ? getSenderByName(contact.assignedTo) : getSender(0);
           await sendSMS(contact.phone, poolAutoReply, senderPhone);
