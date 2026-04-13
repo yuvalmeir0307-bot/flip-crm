@@ -100,6 +100,37 @@ function FlowBranch({ children, label, color }: { children: React.ReactNode; lab
   );
 }
 
+// ── Alert Detail Modal ───────────────────────────────────────────────────────
+type AlertModalData = { title: string; type: string; phone: string; reason: string; fix: string; time: string; details: string };
+function AlertModal({ data, onClose }: { data: AlertModalData; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "#000000cc", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: 16, padding: 28, maxWidth: 540, width: "100%", position: "relative" }}>
+        {/* header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <span style={{ background: "#f9731630", color: "#f97316", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>{data.type}</span>
+          <span style={{ color: "#d1d5db", fontWeight: 600, fontSize: 15 }}>{data.title}</span>
+          <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✕</button>
+        </div>
+        {/* rows */}
+        {[
+          { label: "Contact", value: data.title, color: "#d1d5db" },
+          { label: "Phone",   value: data.phone,  color: "#9ca3af" },
+          { label: "Time",    value: data.time,   color: "#6b7280" },
+          { label: "Reason",  value: data.reason, color: "#fb923c" },
+          { label: "Fix",     value: data.fix,    color: "#4ade80" },
+          { label: "Details", value: data.details, color: "#6b7280" },
+        ].filter(r => r.value).map(r => (
+          <div key={r.label} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
+            <span style={{ color: "#4b5563", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", minWidth: 60, paddingTop: 2 }}>{r.label}</span>
+            <span style={{ color: r.color, fontSize: 13, lineHeight: 1.5, flex: 1 }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [tab, setTab] = useState<"link" | "runs" | "flow" | "general">("link");
@@ -116,6 +147,7 @@ export default function SettingsPage() {
   const [alerts, setAlerts] = useState<LogEntry[]>([]);
   const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [alertModal, setAlertModal] = useState<AlertModalData | null>(null);
 
   // Contacts state (for flow modals)
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -244,6 +276,7 @@ export default function SettingsPage() {
 
   return (
     <div className="app-root">
+      {alertModal && <AlertModal data={alertModal} onClose={() => setAlertModal(null)} />}
       <Sidebar />
       <main className="app-main">
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Settings</h1>
@@ -635,7 +668,7 @@ export default function SettingsPage() {
                             { contact: "Sara Lee",   phone: "+14142345678", reason: "קונטקט כבר קיבל הודעה היום",                   fix: "תקין — ממתין ליום הבא",                         time: "Apr 13 10:13" },
                             { contact: "Mike B.",    phone: "+14143456789", reason: "סקריפט חסר ב-Notion לשלב הזה",                 fix: "הוסף סקריפט ב-Notion Scripts עבור השלב הזה", time: "Apr 13 10:21" },
                           ] as { contact: string; phone: string; reason: string; fix: string; time: string }[]).map((d, i) => (
-                            <tr key={`demo-${i}`} style={{ background: "#1c1008", borderBottom: "1px solid #2a1f0a" }}>
+                            <tr key={`demo-${i}`} onClick={() => setAlertModal({ title: d.contact, type: "BLOCKED", phone: d.phone, reason: d.reason, fix: d.fix, time: d.time, details: "שורת דוגמה — לא אמיתי" })} style={{ background: "#1c1008", borderBottom: "1px solid #2a1f0a", cursor: "pointer" }}>
                               <td style={{ padding: "9px 14px" }}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                                   <span style={{ background: "#f9731630", color: "#f97316", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700, display: "inline-block" }}>BLOCKED</span>
@@ -665,7 +698,7 @@ export default function SettingsPage() {
                               </td>
                             </tr>
                           ) : alerts.map((a, i) => (
-                          <tr key={a.id} style={{ background: i % 2 === 0 ? "transparent" : "#161616" }}>
+                          <tr key={a.id} onClick={() => setAlertModal({ title: a.title.replace("⛔ Blocked: ","").replace("⛔ Auto-reply blocked: ",""), type: a.type, phone: a.phone, reason: a.type==="BLOCKED" ? getBlockReason(a.details) : a.details, fix: a.type==="BLOCKED" ? getBlockFix(a.details) : "", time: a.createdAt ? new Date(a.createdAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "", details: a.details })} style={{ background: i % 2 === 0 ? "transparent" : "#161616", cursor: "pointer" }}>
                             <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
                               <span style={{ background: (ALERT_TYPE_COLORS[a.type] ?? "#6b7280") + "22", color: ALERT_TYPE_COLORS[a.type] ?? "#6b7280", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700 }}>{a.type}</span>
                             </td>
