@@ -3,6 +3,18 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
+const KANBAN_COLUMNS: { id: string; label: string; color: string; filter: (c: Contact) => boolean }[] = [
+  { id: "drip0", label: "Drip 0", color: "#00e5ff", filter: (c) => c.status === "Drip Active" && c.dripStep === 0 },
+  { id: "drip1", label: "Drip 1", color: "#00cfe8", filter: (c) => c.status === "Drip Active" && c.dripStep === 1 },
+  { id: "drip2", label: "Drip 2", color: "#00b8cc", filter: (c) => c.status === "Drip Active" && c.dripStep === 2 },
+  { id: "drip3", label: "Drip 3", color: "#00a0b0", filter: (c) => c.status === "Drip Active" && c.dripStep === 3 },
+  { id: "drip4", label: "Drip 4", color: "#008896", filter: (c) => c.status === "Drip Active" && c.dripStep === 4 },
+  { id: "pool", label: "The Pool", color: "#a855f7", filter: (c) => c.status === "The Pool" },
+  { id: "replied", label: "Replied", color: "#fbbf24", filter: (c) => c.status === "Replied" },
+  { id: "hot", label: "HOT 🔥", color: "#f97316", filter: (c) => c.status === "Replied - Pivot Call Needed - HOT" },
+  { id: "potential", label: "Potential Deal", color: "#10b981", filter: (c) => c.status === "Potential Deal" },
+];
+
 type Contact = {
   id: string; name: string; phone: string; altPhones: string; status: string;
   dripStep: number; poolStep: number; date: string | null;
@@ -411,6 +423,76 @@ function ContactDetailModal({ contact, onClose, onStatusChange, onStageChange, o
   );
 }
 
+function KanbanView({ contacts, onSelectContact }: { contacts: Contact[]; onSelectContact: (c: Contact) => void }) {
+  return (
+    <div style={{
+      display: "flex", gap: 14, overflowX: "auto", paddingBottom: 16,
+      alignItems: "flex-start",
+    }}>
+      {KANBAN_COLUMNS.map((col) => {
+        const cards = contacts.filter(col.filter);
+        return (
+          <div
+            key={col.id}
+            style={{
+              minWidth: 220, width: 220, flexShrink: 0,
+              background: "#1a1a1a", borderRadius: 12,
+              border: `1px solid ${col.color}33`,
+              display: "flex", flexDirection: "column",
+            }}
+          >
+            {/* Column header */}
+            <div style={{
+              padding: "12px 14px", borderBottom: `1px solid ${col.color}22`,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: col.color }}>{col.label}</span>
+              <span style={{
+                background: col.color + "22", color: col.color,
+                borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 700,
+              }}>{cards.length}</span>
+            </div>
+            {/* Cards */}
+            <div style={{ padding: "10px 10px", display: "flex", flexDirection: "column", gap: 8, minHeight: 60 }}>
+              {cards.length === 0 && (
+                <div style={{ fontSize: 12, color: "#333", textAlign: "center", padding: "12px 0" }}>—</div>
+              )}
+              {cards.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => onSelectContact(c)}
+                  style={{
+                    background: "#141414", borderRadius: 8, padding: "10px 12px",
+                    cursor: "pointer", border: "1px solid #252525",
+                    transition: "border-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = col.color + "55")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#252525")}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4, lineHeight: 1.3 }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: "#555", marginBottom: c.assignedTo ? 6 : 0 }}>{c.phone}</div>
+                  {c.assignedTo && (
+                    <span style={{
+                      fontSize: 10, color: "#a78bfa", fontWeight: 600,
+                      background: "#7c3aed22", border: "1px solid #7c3aed33",
+                      borderRadius: 20, padding: "2px 7px", display: "inline-block",
+                    }}>
+                      👤 {c.assignedTo}
+                    </span>
+                  )}
+                  {c.status === "The Pool" && c.poolStep > 0 && (
+                    <div style={{ fontSize: 10, color: "#a855f7", marginTop: 4, fontWeight: 600 }}>Pool {c.poolStep}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ContactsPageInner() {
   const searchParams = useSearchParams();
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -421,6 +503,7 @@ function ContactsPageInner() {
   const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", brokerage: "", area: "", status: "Drip Active", assignedTo: "" });
   const [saving, setSaving] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
   useEffect(() => { loadContacts(); }, []);
 
   async function loadContacts() {
@@ -511,6 +594,31 @@ function ContactsPageInner() {
             <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>{filtered.length} agents</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {/* View toggle */}
+            <div style={{ display: "flex", background: "#1a1a1a", borderRadius: 10, padding: 3, border: "1px solid #2a2a2a" }}>
+              <button
+                onClick={() => setViewMode("table")}
+                style={{
+                  background: viewMode === "table" ? "#2a2a2a" : "none",
+                  color: viewMode === "table" ? "#fff" : "#555",
+                  border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13,
+                  fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                }}
+              >
+                ☰ List
+              </button>
+              <button
+                onClick={() => setViewMode("kanban")}
+                style={{
+                  background: viewMode === "kanban" ? "#2a2a2a" : "none",
+                  color: viewMode === "kanban" ? "#00e5ff" : "#555",
+                  border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13,
+                  fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                }}
+              >
+                ⊞ Pipeline
+              </button>
+            </div>
             <button
               onClick={() => setShowAdd(!showAdd)}
               style={{
@@ -588,8 +696,13 @@ function ContactsPageInner() {
           </div>
         </div>
 
+        {/* Kanban view */}
+        {!loading && viewMode === "kanban" && (
+          <KanbanView contacts={filtered} onSelectContact={setSelectedContact} />
+        )}
+
         {/* Table */}
-        <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+        {viewMode === "table" && <div style={{ background: "#1a1a1a", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
           {loading ? (
             <p style={{ padding: 24, color: "#555", fontSize: 14 }}>Loading contacts...</p>
           ) : (
@@ -665,7 +778,7 @@ function ContactsPageInner() {
             </table>
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
