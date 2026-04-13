@@ -629,6 +629,33 @@ export default function SettingsPage() {
                           <th key={h} style={{ padding: "10px 14px", color: "#6b7280", fontWeight: 500, textAlign: "left", borderBottom: "1px solid #252525", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                         ))}</tr></thead>
                         <tbody>
+                          {/* ── DEMO ROWS (example only) ── */}
+                          {[
+                            { type: "BLOCKED", contact: "John Smith", phone: "+14141234567", reason: "שליחה בשעה 20:05 ישראל (מחוץ ל-09:00–18:00)", fix: "בדוק vercel.json — הכרון רץ בשעה לא נכונה", time: "Apr 13 20:05" },
+                            { type: "BLOCKED", contact: "Sara Lee",   phone: "+14142345678", reason: "קונטקט כבר קיבל הודעה היום",                   fix: "תקין — ממתין ליום הבא",                          time: "Apr 13 10:13" },
+                            { type: "BLOCKED", contact: "Mike B.",    phone: "+14143456789", reason: "סקריפט חסר ב-Notion לשלב הזה",                 fix: "הוסף סקריפט ב-Notion Scripts עבור השלב הזה",  time: "Apr 13 10:21" },
+                          ].map((d, i) => (
+                            <tr key={`demo-${i}`} style={{ background: i % 2 === 0 ? "#1a0000" : "#150000", opacity: 0.75 }}>
+                              <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                  <span style={{ background: "#f9731622", color: "#f97316", fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 700, width: "fit-content" }}>{d.type}</span>
+                                  <span style={{ color: "#ef4444", fontSize: 9, fontWeight: 800, letterSpacing: "0.1em" }}>דוגמה</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: "9px 14px", color: "#9ca3af", borderBottom: "1px solid #1e1e1e", fontWeight: 500 }}>{d.contact}</td>
+                              <td style={{ padding: "9px 14px", color: "#6b7280", borderBottom: "1px solid #1e1e1e", fontFamily: "monospace", fontSize: 11 }}>{d.phone}</td>
+                              <td style={{ padding: "9px 14px", color: "#f97316", borderBottom: "1px solid #1e1e1e", fontSize: 12 }}>{d.reason}</td>
+                              <td style={{ padding: "9px 14px", color: "#22c55e", borderBottom: "1px solid #1e1e1e", fontSize: 12 }}>{d.fix}</td>
+                              <td style={{ padding: "9px 14px", color: "#4b5563", borderBottom: "1px solid #1e1e1e", fontSize: 11 }}>{d.time}</td>
+                              <td style={{ padding: "9px 14px", borderBottom: "1px solid #1e1e1e" }}>
+                                <span style={{ color: "#4b5563", fontSize: 11, fontStyle: "italic" }}>demo</span>
+                              </td>
+                            </tr>
+                          ))}
+                          {/* ── divider ── */}
+                          <tr><td colSpan={7} style={{ padding: "6px 14px", background: "#0d0d0d", borderBottom: "1px solid #252525" }}>
+                            <span style={{ color: "#374151", fontSize: 10, letterSpacing: "0.08em" }}>▲ DEMO — לא אמיתי &nbsp;|&nbsp; ▼ LIVE — אלרטים אמיתיים</span>
+                          </td></tr>
                           {alerts.length === 0 ? (
                             <tr>
                               <td colSpan={7} style={{ padding: "20px 14px", textAlign: "center" }}>
