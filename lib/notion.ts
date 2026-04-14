@@ -3,9 +3,20 @@ import { Client } from "@notionhq/client";
 const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
 const DB_ID = process.env.NOTION_DATABASE_ID!;
 
+async function queryAllPages(params: Parameters<typeof notion.databases.query>[0]) {
+  const results: Awaited<ReturnType<typeof notion.databases.query>>["results"] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.databases.query({ ...params, start_cursor: cursor, page_size: 100 });
+    results.push(...res.results);
+    cursor = res.has_more && res.next_cursor ? res.next_cursor : undefined;
+  } while (cursor);
+  return results;
+}
+
 export async function getActiveContacts() {
   const today = new Date().toISOString().split("T")[0];
-  const res = await notion.databases.query({
+  return queryAllPages({
     database_id: DB_ID,
     filter: {
       and: [
@@ -24,15 +35,13 @@ export async function getActiveContacts() {
       ],
     },
   });
-  return res.results;
 }
 
 export async function getAllContacts() {
-  const res = await notion.databases.query({
+  return queryAllPages({
     database_id: DB_ID,
     sorts: [{ property: "Name", direction: "ascending" }],
   });
-  return res.results;
 }
 
 export async function updateContact(pageId: string, properties: Record<string, unknown>) {
