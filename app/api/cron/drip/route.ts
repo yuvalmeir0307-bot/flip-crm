@@ -54,8 +54,16 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
+    // Skip toll-free numbers (800/888/877/866/855/844/833) — these are brokerage main lines, not personal cells
+    const digitsOnly = contact.phone.replace(/\D/g, "");
+    const isTollFree = /^1?(800|888|877|866|855|844|833)/.test(digitsOnly);
+    if (isTollFree) {
+      logs.push(`Skipping ${contact.name} (${contact.phone}) - toll-free number, not a personal cell`);
+      continue;
+    }
+
     // Phone filter for targeted testing
-    if (filterPhone && contact.phone.replace(/\D/g, "") !== filterPhone.replace(/\D/g, "")) {
+    if (filterPhone && digitsOnly !== filterPhone.replace(/\D/g, "")) {
       logs.push(`Skipping ${contact.name} (${contact.phone}) - not target`);
       continue;
     }
@@ -75,9 +83,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const rawFirst = contact.name.split(" ")[0] || "";
-    // Sanitize: strip non-ASCII chars (e.g. ???? from encoding issues), fallback to "there"
-    const firstName = rawFirst.replace(/[^\x20-\x7E]/g, "").trim() || "there";
+    // Build first name — handle compound first names like "Jo Ann" or "Mary Jo"
+    // If the first word is ≤ 3 chars and there are 3+ parts, use first two words (e.g. "Jo Ann Vetter" → "Jo Ann")
+    const nameParts = contact.name.split(" ").map(p => p.replace(/[^\x20-\x7E]/g, "").trim()).filter(Boolean);
+    const firstName = (() => {
+      if (nameParts.length >= 3 && nameParts[0].length <= 3) return `${nameParts[0]} ${nameParts[1]}`;
+      return nameParts[0] || "there";
+    })();
     // Prefer assignedTo so pool follow-ups always use the agent who originally talked to this contact
     // Case-insensitive check to handle variations (lowercase, trailing spaces, "Both", etc.)
     const assignedLower = (contact.assignedTo ?? "").toLowerCase().trim();
@@ -104,8 +116,8 @@ export async function GET(req: NextRequest) {
     logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
     logs.push(`Message: "${message}"`);
 
-    // Run send guard — blocks wrong-hour sends, empty scripts, double-sends
-    const guard = runGuard(message, contact.lastContact);
+    // Run send guard — skip time window check on dry runs so testing works at any hour
+    const guard = runGuard(message, contact.lastContact, dryRun);
     if (!guard.ok) {
       logs.push(`⛔ ${contact.name} — ${guard.reason}`);
       if (!dryRun) {
