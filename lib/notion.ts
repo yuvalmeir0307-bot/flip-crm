@@ -1,6 +1,4 @@
-import { Client } from "@notionhq/client";
-
-const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
+import { notion } from "@/lib/notion-client";
 const DB_ID = process.env.NOTION_DATABASE_ID!;
 
 async function queryAllPages(params: Parameters<typeof notion.databases.query>[0]) {

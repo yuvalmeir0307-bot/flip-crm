@@ -27,6 +27,10 @@ async function ensureAssignedToProperty() {
  *   4. Skip contacts that already have assignedTo set.
  */
 export async function POST(req: NextRequest) {
+  const adminSecret = process.env.ADMIN_SECRET ?? "flip-admin-2025";
+  if (req.headers.get("x-admin-secret") !== adminSecret) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
   const authHeader = req.headers.get("authorization");
   const secret = process.env.CRON_SECRET || "flip123secret";

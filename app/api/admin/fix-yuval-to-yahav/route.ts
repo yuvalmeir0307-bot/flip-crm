@@ -18,6 +18,10 @@ const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
 const DB_ID = process.env.NOTION_DATABASE_ID!;
 
 export async function POST(req: NextRequest) {
+  const adminSecret = process.env.ADMIN_SECRET ?? "flip-admin-2025";
+  if (req.headers.get("x-admin-secret") !== adminSecret) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   const dryRun = body.dryRun === true;
 

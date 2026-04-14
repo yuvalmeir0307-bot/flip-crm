@@ -1,6 +1,4 @@
-import { Client } from "@notionhq/client";
-
-const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
+import { notion } from "@/lib/notion-client";
 const LOGS_DB_ID = process.env.NOTION_LOGS_DB ?? "e8199147-19bf-418f-b5c5-9f4173eb4fb6";
 
 export type LogType =
@@ -9,6 +7,7 @@ export type LogType =
   | "FAILED_SMS"
   | "STOP"
   | "BLOCKED"
+  | "MISSED_CALL"
   | "DAILY_REPORT"
   | "SMS_SENT"
   | "DRIP_TRIGGER"

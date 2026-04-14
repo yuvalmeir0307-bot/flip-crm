@@ -1,6 +1,4 @@
-import { Client } from "@notionhq/client";
-
-const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
+import { notion } from "@/lib/notion-client";
 const SCRIPTS_DB_ID = process.env.SCRIPTS_DB_ID!;
 
 export interface ScriptEntry {

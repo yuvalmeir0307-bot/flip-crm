@@ -10,6 +10,10 @@ const DB_ID = process.env.NOTION_DATABASE_ID!;
  * them to The Pool at step 2. Safe to re-run — will report current state.
  */
 export async function POST(req: NextRequest) {
+  const adminSecret = process.env.ADMIN_SECRET ?? "flip-admin-2025";
+  if (req.headers.get("x-admin-secret") !== adminSecret) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const authHeader = req.headers.get("authorization");
   const secret = process.env.CRON_SECRET || "flip123secret";
   if (authHeader !== `Bearer ${secret}`) {
