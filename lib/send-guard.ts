@@ -5,14 +5,28 @@ export type GuardResult =
   | { ok: true }
   | { ok: false; reason: string };
 
-// Israel time = UTC+3 (IDT summer). Allowed window: 09:00–18:00
+// US Central time (recipients are in Wisconsin). CDT = UTC-5, CST = UTC-6.
+// Simple DST: second Sunday of March → first Sunday of November = CDT (UTC-5), else CST (UTC-6).
+function usCentralOffset(): number {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  // Second Sunday of March
+  const marchStart = new Date(Date.UTC(year, 2, 1));
+  const dstStart = new Date(Date.UTC(year, 2, 8 + ((7 - marchStart.getUTCDay()) % 7) + 1));
+  // First Sunday of November
+  const novStart = new Date(Date.UTC(year, 10, 1));
+  const dstEnd = new Date(Date.UTC(year, 10, 1 + ((7 - novStart.getUTCDay()) % 7)));
+  return now >= dstStart && now < dstEnd ? -5 : -6;
+}
+
 export function checkTimeWindow(): GuardResult {
   const now = new Date();
-  const israelHour = (now.getUTCHours() + 3) % 24;
-  if (israelHour < 9 || israelHour >= 18) {
+  const offset = usCentralOffset();
+  const centralHour = ((now.getUTCHours() + offset) % 24 + 24) % 24;
+  if (centralHour < 9 || centralHour >= 20) {
     return {
       ok: false,
-      reason: `BLOCKED: Outside send window — Israel time is ${israelHour}:${String(now.getUTCMinutes()).padStart(2,"0")}. Allowed 09:00–18:00`,
+      reason: `BLOCKED: Outside send window — US Central time is ${centralHour}:${String(now.getUTCMinutes()).padStart(2,"0")}. Allowed 09:00–20:00`,
     };
   }
   return { ok: true };
