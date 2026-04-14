@@ -1,13 +1,13 @@
-const API_KEY = process.env.OPENPHONE_API_KEY!;
+const API_KEY = (process.env.OPENPHONE_API_KEY ?? "").trim();
 
 // OpenPhone API v1 requires phoneNumberId (e.g. "PNoBTtFxey") for the 'from' field,
 // NOT the E.164 phone number string. Set YUVAL_PHONE_ID / YAHAV_PHONE_ID in Vercel.
-const YUVAL_ID = process.env.YUVAL_PHONE_ID!;
-const YAHAV_ID = process.env.YAHAV_PHONE_ID!;
+const YUVAL_ID = (process.env.YUVAL_PHONE_ID ?? "").trim();
+const YAHAV_ID = (process.env.YAHAV_PHONE_ID ?? "").trim();
 
 // E.164 phone numbers — kept for UI display and personal alert recipients
-const YUVAL = process.env.YUVAL_PHONE_NUMBER!;
-const YAHAV = process.env.YAHAV_PHONE_NUMBER!;
+const YUVAL = (process.env.YUVAL_PHONE_NUMBER ?? "").trim();
+const YAHAV = (process.env.YAHAV_PHONE_NUMBER ?? "").trim();
 
 // Personal numbers for partner alerts (separate from the sender pool)
 const YUVAL_PERSONAL = process.env.YUVAL_PERSONAL_PHONE ?? YUVAL;
