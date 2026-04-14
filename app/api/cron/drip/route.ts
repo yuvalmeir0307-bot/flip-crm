@@ -122,10 +122,16 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const result = await sendSMS(contact.phone, message, senderPhone);
+    let result: { ok: boolean; error?: string; messageId?: string };
+    try {
+      result = await sendSMS(contact.phone, message, senderPhone);
+    } catch (e: unknown) {
+      logs.push(`❌ ${contact.name} — sendSMS threw: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    }
 
-    // Log the run
-    await createRunLog({
+    // Log the run — non-blocking, never crash the main flow
+    createRunLog({
       date: new Date().toISOString(),
       type: isPool ? "Pool" : "Drip",
       contactName: contact.name,
@@ -134,7 +140,7 @@ export async function GET(req: NextRequest) {
       status: result.ok ? "success" : "failed",
       message: message.slice(0, 200),
       error: result.ok ? "" : (result.error ?? "Unknown"),
-    });
+    }).catch(() => {});
 
     if (result.ok) {
       const updateProps: Record<string, unknown> = {
@@ -158,15 +164,18 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      await updateContact(contact.id, updateProps);
+      try {
+        await updateContact(contact.id, updateProps);
+      } catch (e: unknown) {
+        logs.push(`⚠️ ${contact.name} — SMS sent but Notion update failed: ${e instanceof Error ? e.message : String(e)}`);
+        continue;
+      }
 
       // Best-effort: record which agent sent this message (drip or pool) so future sends stay consistent
       if (!contact.assignedTo) {
-        try {
-          await updateContact(contact.id, {
-            "Assigned To": { rich_text: [{ text: { content: senderName } }] },
-          });
-        } catch { /* ignore if Assigned To field not yet created in Notion */ }
+        updateContact(contact.id, {
+          "Assigned To": { rich_text: [{ text: { content: senderName } }] },
+        }).catch(() => {});
       }
       logs.push(`✅ Sent & updated Notion`);
     } else {
