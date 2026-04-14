@@ -417,6 +417,8 @@ type Contact = {
   source4?: number | null;
   wholesaleFeeOverride?: number | null;
   propertyAddress?: string;
+  offerPrice?: number | null;
+  counterAmount?: number | null;
 };
 
 const WARMTH_OPTIONS = ["Cold", "Warm", "Hot"];
@@ -445,7 +447,8 @@ function ScriptPanel({ title, accentColor, children }: { title: string; accentCo
     <div style={{
       background: "#141414", borderRadius: 12, marginBottom: 16,
       border: `1px solid ${accentColor}33`,
-      overflow: "hidden",
+      overflow: open ? "visible" : "hidden",
+      position: "sticky", top: 0, zIndex: 20,
     }}>
       <button
         onClick={() => setOpen(!open)}
@@ -969,7 +972,7 @@ function MAOSection({ contact, onSave }: {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: accentColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Offer Calculator
+            Deal Analyzer — Underwriting
           </span>
           {hasPreview ? (
             <span style={{ background: `${accentColor}22`, color: accentColor, border: `1px solid ${accentColor}44`, borderRadius: 20, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>
@@ -1202,9 +1205,9 @@ function MAOSection({ contact, onSave }: {
             </>
           )}
 
-          {/* MAO Override */}
+          {/* Offer Override */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>MAO Override (optional)</label>
+            <label style={labelStyle}>Offer Override (optional)</label>
             <input
               type="number"
               value={maoOverride}
@@ -1220,10 +1223,10 @@ function MAOSection({ contact, onSave }: {
             )}
           </div>
 
-          {/* Final MAO */}
+          {/* Max Offer */}
           <div style={{ background: `${accentColor}11`, border: `1px solid ${accentColor}44`, borderRadius: 8, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
-              Final MAO
+              Max Offer (MAO)
               {maoOverride !== "" && <span style={{ fontSize: 10, color: "#888", marginLeft: 6 }}>(overridden)</span>}
             </span>
             <span style={{ fontSize: 18, fontWeight: 800, color: accentColor }}>{formatCurrency(finalMAO)}</span>
@@ -1383,6 +1386,8 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
   const [followUpDate, setFollowUpDate] = useState(contact.followUpDate ?? "");
   const [saving, setSaving] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  const [offerPrice, setOfferPrice] = useState<string>(contact.offerPrice != null ? String(contact.offerPrice) : "");
+  const [counterAmount, setCounterAmount] = useState<string>(contact.counterAmount != null ? String(contact.counterAmount) : "");
   const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
   const [callError, setCallError] = useState("");
   const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
@@ -1471,7 +1476,13 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
 
   async function save() {
     setSaving(true);
-    await onSave(contact.id, { notes, warmth, followUpDate: followUpDate || null });
+    await onSave(contact.id, {
+      notes,
+      warmth,
+      followUpDate: followUpDate || null,
+      offerPrice: offerPrice !== "" ? Number(offerPrice) : null,
+      counterAmount: counterAmount !== "" ? Number(counterAmount) : null,
+    });
     setSaving(false);
     setEditing(false);
   }
@@ -1600,6 +1611,43 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
         </div>
       </div>
 
+      {/* Deal Status Pipeline Strip */}
+      {(() => {
+        const DEAL_STAGES = [
+          { key: "Potential Deal", label: "Potential Deal", color: "#10b981" },
+          { key: "Underwriting", label: "Underwriting", color: "#22c55e" },
+          { key: "Offer Submitted", label: "Offer Sent", color: "#facc15" },
+          { key: "Counter", label: "Counter", color: "#f97316" },
+          { key: "Contract Signed", label: "Contract Signed", color: "#a855f7" },
+        ];
+        const currentIdx = DEAL_STAGES.findIndex(s => s.key === contact.status);
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 14, overflowX: "auto" }}>
+            {DEAL_STAGES.map((stage, i) => {
+              const isActive = i === currentIdx;
+              const isPast = i < currentIdx;
+              return (
+                <div key={stage.key} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    flex: 1, textAlign: "center", fontSize: 9, fontWeight: 700,
+                    padding: "4px 4px", borderRadius: i === 0 ? "6px 0 0 6px" : i === DEAL_STAGES.length - 1 ? "0 6px 6px 0" : 0,
+                    background: isActive ? stage.color : isPast ? stage.color + "55" : "#1e1e1e",
+                    color: isActive ? "#000" : isPast ? stage.color : "#444",
+                    textTransform: "uppercase", letterSpacing: "0.04em",
+                    border: `1px solid ${isActive ? stage.color : isPast ? stage.color + "44" : "#2a2a2a"}`,
+                    borderRight: i < DEAL_STAGES.length - 1 ? "none" : undefined,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    transition: "all 0.15s",
+                  }}>
+                    {stage.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {contact.assignedTo && (
         <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6, fontWeight: 600 }}>
           👤 {contact.assignedTo}
@@ -1614,6 +1662,50 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
 
       {/* Follow Up Date */}
       <FollowUpPicker value={followUpDate} onChange={setFollowUpDate} editing={editing} isOverdue={!!isOverdue} isToday={!!isToday} />
+
+      {/* Offer Price — shown for Offer Submitted / Underwriting */}
+      {(contact.status === "Offer Submitted" || contact.status === "Underwriting") && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+            Offer Price
+          </div>
+          {editing ? (
+            <input
+              type="number"
+              value={offerPrice}
+              onChange={(e) => setOfferPrice(e.target.value)}
+              placeholder="Enter offer amount..."
+              style={{ width: "100%", fontSize: 13, padding: "6px 10px", borderRadius: 8, background: "#111", border: `1px solid ${offerPrice !== "" ? "#10b981" : "#333"}`, color: "#fff", outline: "none" }}
+            />
+          ) : offerPrice !== "" ? (
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>${Number(offerPrice).toLocaleString()}</span>
+          ) : (
+            <span style={{ fontSize: 13, color: "#444" }}>Not set — add offer amount</span>
+          )}
+        </div>
+      )}
+
+      {/* Counter Amount — shown for Counter status */}
+      {contact.status === "Counter" && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+            Counter Amount
+          </div>
+          {editing ? (
+            <input
+              type="number"
+              value={counterAmount}
+              onChange={(e) => setCounterAmount(e.target.value)}
+              placeholder="Enter counter offer amount..."
+              style={{ width: "100%", fontSize: 13, padding: "6px 10px", borderRadius: 8, background: "#111", border: `1px solid ${counterAmount !== "" ? "#f97316" : "#333"}`, color: "#fff", outline: "none" }}
+            />
+          ) : counterAmount !== "" ? (
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#f97316" }}>${Number(counterAmount).toLocaleString()}</span>
+          ) : (
+            <span style={{ fontSize: 13, color: "#444" }}>Not set — log the counter amount</span>
+          )}
+        </div>
+      )}
 
       {/* Notes */}
       <div style={{ marginBottom: 14 }}>
@@ -1639,7 +1731,7 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
         )}
       </div>
 
-      {/* MAO Calculator */}
+      {/* Deal Analyzer (Underwriting) */}
       <MAOSection contact={contact} onSave={onSave} />
 
       {/* Warmth selector (editing only) */}
@@ -1951,8 +2043,11 @@ export default function OpportunitiesPage() {
     const res = await fetch("/api/contacts");
     const all: Contact[] = await res.json();
     setAllContacts(all);
+    const todayStr = new Date().toISOString().split("T")[0];
     setContacts(all.filter((c) =>
-      c.status === "Replied" || c.status === "Potential Deal"
+      c.status === "Replied" ||
+      c.status === "Potential Deal" ||
+      (c.status === "The Pool" && c.followUpDate && c.followUpDate <= todayStr)
     ));
     setLoading(false);
   }
@@ -1988,6 +2083,8 @@ export default function OpportunitiesPage() {
   const filteredByTeam = teamFilter === "All" ? contacts : contacts.filter((c) => c.assignedTo === teamFilter);
   const hotContacts = filteredByTeam.filter((c) => c.status === "Replied");
   const dealContacts = filteredByTeam.filter((c) => c.status === "Potential Deal");
+  const todayStr = new Date().toISOString().split("T")[0];
+  const poolFollowUps = filteredByTeam.filter((c) => c.status === "The Pool" && c.followUpDate && c.followUpDate <= todayStr);
 
   const TABS = [
     { key: "opportunities" as const, label: "Opportunities" },
@@ -2192,6 +2289,58 @@ export default function OpportunitiesPage() {
             </div>
 
           </div>
+
+          {/* Pool Follow-Ups — Pool contacts with manual follow-up due today */}
+          {poolFollowUps.length > 0 && (
+            <div style={{ marginTop: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#a855f7", boxShadow: "0 0 8px #a855f7" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a855f7", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Pool — Follow-Ups Due
+                </span>
+                <span style={{ background: "#a855f722", color: "#c084fc", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+                  {poolFollowUps.length}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {poolFollowUps.map((c) => (
+                  <div key={c.id} style={{
+                    background: "#1a1a1a", borderRadius: 14,
+                    border: "1px solid #a855f733", padding: "14px 16px",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{c.name}</span>
+                      <span style={{ fontSize: 11, color: "#a855f7", fontWeight: 600, background: "#a855f722", borderRadius: 20, padding: "2px 8px" }}>Pool</span>
+                    </div>
+                    {c.brokerage && <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>🏢 {c.brokerage}</div>}
+                    {c.assignedTo && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6 }}>👤 {c.assignedTo}</div>}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: c.followUpDate! < todayStr ? "#ef4444" : "#facc15", marginBottom: 10 }}>
+                      {c.followUpDate! < todayStr ? "⚠️ Overdue: " : "📅 Due: "}{c.followUpDate}
+                    </div>
+                    {c.lastReply && (
+                      <div style={{ fontSize: 12, color: "#555", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4 }}>
+                        &ldquo;{c.lastReply.replace(/^\[.*?\]\s*/, "")}&rdquo;
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <a
+                        href={`sms:${c.phone}`}
+                        style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744", textDecoration: "none", fontWeight: 600 }}
+                      >
+                        💬 Message
+                      </a>
+                      <button
+                        onClick={() => handleStatusChange(c.id, "Potential Deal")}
+                        style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, background: "#10b98122", color: "#34d399", border: "1px solid #10b98144", cursor: "pointer", fontWeight: 600 }}
+                      >
+                        Potential Deal
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           </>
         )}
       </div>

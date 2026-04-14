@@ -25,7 +25,23 @@ export async function POST(req: NextRequest) {
       eventType = "SMS";
     } else if (type === "call.completed" && (data?.data?.object?.direction === "inbound" || data?.data?.direction === "inbound" || data?.data?.object?.direction === "incoming" || data?.data?.direction === "incoming")) {
       const duration = data?.data?.object?.duration ?? data?.data?.duration ?? 0;
-      if (duration < 10) return NextResponse.json({ ok: true, reason: "missed_call" });
+      if (duration < 10) {
+        // Missed call — create an alert if we know the contact
+        const missedPhone: string | null = data?.data?.object?.from ?? data?.data?.from ?? null;
+        if (missedPhone) {
+          const missedPage = await findContactByPhone(missedPhone).catch(() => null);
+          if (missedPage) {
+            const missedContact = extractContactProps(missedPage as Record<string, unknown>);
+            await createLog(
+              `📵 Missed call from ${missedContact.name}`,
+              "MISSED_CALL",
+              missedPhone,
+              `Status: ${missedContact.status} — check Opportunities tab`
+            ).catch(() => {});
+          }
+        }
+        return NextResponse.json({ ok: true, reason: "missed_call" });
+      }
       phone = data?.data?.object?.from ?? data?.data?.from;
       content = "Incoming Call Detected";
       eventType = "Phone Call";

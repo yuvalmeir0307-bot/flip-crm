@@ -8,6 +8,7 @@ type Contact = {
   dripStep: number; poolStep: number; date: string | null;
   lastContact: string | null; lastReply: string; brokerage: string; area: string;
   assignedTo?: string;
+  followUpDate?: string | null;
 };
 
 type AlertEntry = {
@@ -158,6 +159,10 @@ export default function Dashboard() {
   const dueToday = contacts.filter(
     (c) => (c.status === "Drip Active" || c.status === "The Pool") && (!c.date || c.date <= today)
   );
+  const followUpsToday = contacts.filter(
+    (c) => c.followUpDate && c.followUpDate <= today &&
+      ["Replied", "Replied - Pivot Call Needed - HOT", "Potential Deal", "Underwriting", "Offer Submitted", "Counter"].includes(c.status)
+  ).sort((a, b) => (a.followUpDate ?? "").localeCompare(b.followUpDate ?? ""));
 
   // Road to First Deal stats
   const DAILY_MSG_GOAL = 10;
@@ -910,6 +915,67 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Follow-Up Reminders */}
+        <div style={{
+          background: followUpsToday.length > 0 ? "#1a1510" : "#1a1a1a",
+          borderRadius: 14, padding: "20px 24px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.12)", marginBottom: 20,
+          border: followUpsToday.length > 0 ? "1px solid #f9731633" : "1px solid transparent",
+        }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ffffff", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+            {followUpsToday.length > 0 ? "🔔" : "🗓"} Follow-Up Reminders
+            <span style={{
+              background: followUpsToday.length > 0 ? "#f9731622" : "#ffffff11",
+              color: followUpsToday.length > 0 ? "#f97316" : "#666",
+              borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 700,
+            }}>
+              {followUpsToday.length} due
+            </span>
+          </h2>
+          {loading ? (
+            <p style={{ color: "#555", fontSize: 14 }}>Loading...</p>
+          ) : followUpsToday.length === 0 ? (
+            <p style={{ color: "#555", fontSize: 14 }}>No follow-ups due today.</p>
+          ) : (
+            <div className="table-scroll">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ color: "#444", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {["Name", "Phone", "Status", "Follow-Up Date", "Brokerage"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", paddingBottom: 10, fontWeight: 500 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {followUpsToday.map((c) => {
+                    const isOverdue = c.followUpDate! < today;
+                    return (
+                      <tr key={c.id} style={{ borderTop: "1px solid #252525" }}>
+                        <td style={{ padding: "12px 0", color: "#fff", fontWeight: 500 }}>{c.name}</td>
+                        <td style={{ padding: "12px 0", color: "#555" }}>{c.phone}</td>
+                        <td style={{ padding: "12px 0" }}>
+                          <span style={{
+                            background: (STATUS_COLORS[c.status] ?? "#444") + "22",
+                            color: STATUS_COLORS[c.status] ?? "#888",
+                            borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 600,
+                          }}>
+                            {STATUS_SHORT[c.status] ?? c.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 0", fontWeight: 700, fontSize: 12, color: isOverdue ? "#ef4444" : "#facc15" }}>
+                          {isOverdue ? "⚠️ " : "📅 "}{c.followUpDate}
+                          {isOverdue && <span style={{ fontSize: 10, color: "#ef4444", marginLeft: 4 }}>(overdue)</span>}
+                        </td>
+                        <td style={{ padding: "12px 0", color: "#555" }}>{c.brokerage}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Due Today */}
