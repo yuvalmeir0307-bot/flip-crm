@@ -29,11 +29,19 @@ export async function GET(req: NextRequest) {
   let notionScripts: ScriptEntry[] = [];
   try {
     notionScripts = await getAllScripts();
-  } catch {
-    // Scripts DB unavailable — all contacts will be skipped this run
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, logs: [`❌ Failed to load scripts from Notion: ${e instanceof Error ? e.message : String(e)}`] });
+  }
+  if (notionScripts.length === 0) {
+    return NextResponse.json({ ok: false, logs: [`⚠️ No scripts found in Notion Scripts DB — nothing to send`] });
   }
 
-  const pages = await getActiveContacts();
+  let pages: Awaited<ReturnType<typeof getActiveContacts>>;
+  try {
+    pages = await getActiveContacts();
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, logs: [`❌ Failed to fetch contacts from Notion: ${e instanceof Error ? e.message : String(e)}`] });
+  }
   const logs: string[] = [`Found ${pages.length} contacts to process${filterPhone ? ` (filtered to: ${filterPhone})` : ""}${firstOnly ? " [FIRST TOUCH ONLY]" : ""}${dryRun ? " [DRY RUN]" : ""}`];
 
   for (let i = 0; i < pages.length; i++) {

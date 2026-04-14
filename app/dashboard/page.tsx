@@ -140,11 +140,20 @@ export default function Dashboard() {
     setShowConfirm(false);
     setRunningCron(true);
     setCronLogs([]);
-    const res = await fetch("/api/run-drip?firstOnly=true");
-    const data = await res.json();
-    setCronLogs(data.logs ?? []);
-    setRunningCron(false);
-    fetch("/api/contacts").then((r) => r.json()).then(setContacts);
+    try {
+      const res = await fetch("/api/run-drip?firstOnly=true");
+      const data = await res.json();
+      if (!res.ok) {
+        setCronLogs([`❌ Server error ${res.status}: ${data.error ?? JSON.stringify(data)}`]);
+      } else {
+        setCronLogs(data.logs ?? ["⚠️ No logs returned from server"]);
+      }
+    } catch (e: unknown) {
+      setCronLogs([`❌ Request failed: ${e instanceof Error ? e.message : "Unknown error"}`]);
+    } finally {
+      setRunningCron(false);
+      fetch("/api/contacts").then((r) => r.json()).then(setContacts).catch(() => {});
+    }
   }
 
   const counts = {
