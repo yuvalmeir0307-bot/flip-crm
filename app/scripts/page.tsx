@@ -137,7 +137,7 @@ function StepCard({ script, onSave, onDelete, onTest }: {
         </div>
       </div>
 
-      <p style={{ fontSize: 11, color: "#555", fontWeight: 500, marginBottom: 8 }}>Yahav&apos;s message</p>
+      <p style={{ fontSize: 11, color: "#555", fontWeight: 500, marginBottom: 8 }}>Use [Name] and [Sender] as placeholders</p>
 
       {editing ? (
         <textarea
@@ -173,6 +173,7 @@ export default function ScriptsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStep, setNewStep] = useState({ label: "", message: "", delay: 7 });
   const [addingSaving, setAddingSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { loadScripts(); }, []);
 
@@ -184,6 +185,17 @@ export default function ScriptsPage() {
       setScripts(Array.isArray(data) ? data : []);
     } catch { setError("Failed to load scripts"); }
     setLoading(false);
+  }
+
+  async function handleSyncDefaults() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/scripts/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) { await loadScripts(); }
+      else { setError(data.error ?? "Sync failed"); }
+    } catch { setError("Sync request failed"); }
+    setSyncing(false);
   }
 
   async function handleSave(id: string, message: string) {
@@ -266,12 +278,21 @@ export default function ScriptsPage() {
               </button>
             ))}
           </div>
-          <button onClick={() => setShowAddForm(!showAddForm)} style={{
-            fontSize: 13, padding: "7px 16px", borderRadius: 8, fontWeight: 500, cursor: "pointer",
-            border: "1px solid #1a1a1a", color: "#111827", background: "#fff", marginBottom: 8,
-          }}>
-            + Add Step
-          </button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <button onClick={handleSyncDefaults} disabled={syncing} style={{
+              fontSize: 13, padding: "7px 16px", borderRadius: 8, fontWeight: 600, cursor: syncing ? "default" : "pointer",
+              border: "1px solid #00e5ff55", color: "#00e5ff", background: "#00e5ff11",
+              opacity: syncing ? 0.6 : 1,
+            }}>
+              {syncing ? "⏳ Syncing..." : "⚡ Sync Defaults"}
+            </button>
+            <button onClick={() => setShowAddForm(!showAddForm)} style={{
+              fontSize: 13, padding: "7px 16px", borderRadius: 8, fontWeight: 500, cursor: "pointer",
+              border: "1px solid #333", color: "#999", background: "transparent",
+            }}>
+              + Add Step
+            </button>
+          </div>
         </div>
 
 
@@ -307,9 +328,22 @@ export default function ScriptsPage() {
               </form>
             )}
 
+            {/* Empty state */}
+            {displayed.length === 0 && !loading && (
+              <div style={{ textAlign: "center", padding: "40px 20px", background: "#1a1a1a", borderRadius: 12 }}>
+                <p style={{ color: "#555", fontSize: 14, marginBottom: 16 }}>No {tab} scripts in Notion yet.</p>
+                <button onClick={handleSyncDefaults} disabled={syncing} style={{
+                  fontSize: 14, padding: "10px 24px", borderRadius: 8, fontWeight: 700, cursor: "pointer",
+                  background: "#00e5ff", color: "#000", border: "none",
+                }}>
+                  {syncing ? "Creating..." : "⚡ Load All 14 Default Scripts"}
+                </button>
+              </div>
+            )}
+
             {/* Footer */}
-            <div style={{ textAlign: "center", fontSize: 12, color: "#555", padding: "14px 0", borderTop: "1px dashed #e5e7eb", marginTop: 4 }}>
-              {tab === "Drip" ? "📋 After Step 5 → auto-moves to The Pool" : "🔁 After Step 9: loops back to Step 5"}
+            <div style={{ textAlign: "center", fontSize: 12, color: "#555", padding: "14px 0", borderTop: "1px dashed #333", marginTop: 4 }}>
+              {tab === "Drip" ? "📋 After Step 4 → contact graduates to The Pool (Step 1, +7 days)" : "🔁 After Pool Step 9 → loops back to Step 1"}
             </div>
           </div>
         )}
