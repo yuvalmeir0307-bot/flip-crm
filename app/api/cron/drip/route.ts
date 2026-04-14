@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveContacts, updateContact, extractContactProps, createRunLog } from "@/lib/notion";
 import { sendSMS, getSender, getSenderName, getSenderByName } from "@/lib/openphone";
+
+export const maxDuration = 300; // Allow up to 5 minutes for large contact lists
 import {
   getDripDelay,
   getPoolDelay,

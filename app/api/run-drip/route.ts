@@ -3,6 +3,8 @@ import { verifyToken } from "@/lib/auth";
 import { cookies, headers } from "next/headers";
 import { createLog } from "@/lib/logs";
 
+export const maxDuration = 300;
+
 export async function GET(req: NextRequest) {
   // Require login — secret never leaves the server
   const cookieStore = await cookies();
