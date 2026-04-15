@@ -75,6 +75,8 @@ export default function Dashboard() {
   const [grabResult, setGrabResult] = useState<{ person: string; added: string[]; skipped: string[]; errors: string[] } | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
   const [runLogs, setRunLogs] = useState<RunLog[]>([]);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; job1?: { fixed: number; alreadyCorrect: number }; job2?: { updated: number; mismatches: number; verifiedCorrect: number }; logs?: string[] } | null>(null);
 
   const DEFAULT_GOALS = {
     yuval: [
@@ -131,6 +133,23 @@ export default function Dashboard() {
       setGrabResult({ person, added: [], skipped: [], errors: ["Network error"] });
     } finally {
       setGrabLoading((prev) => ({ ...prev, [person]: false }));
+    }
+  }
+
+  async function runAgentVerify() {
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    try {
+      const res = await fetch("/api/agent-verify", {
+        method: "POST",
+        headers: { "x-dashboard-trigger": "1" },
+      });
+      const data = await res.json();
+      setVerifyResult(data);
+    } catch {
+      setVerifyResult({ ok: false, logs: ["Network error"] });
+    } finally {
+      setVerifyLoading(false);
     }
   }
 
@@ -275,6 +294,20 @@ export default function Dashboard() {
                 {grabLoading[person] ? `Grabbing ${person}...` : `Grab Agents → ${person}`}
               </button>
             ))}
+            <button
+              onClick={runAgentVerify}
+              disabled={verifyLoading}
+              style={{
+                background: verifyLoading ? "#1a1a1a" : "#0f172a",
+                color: verifyLoading ? "#555" : "#22d3ee",
+                border: "1px solid #22d3ee44",
+                borderRadius: 10, padding: "11px 18px", fontWeight: 700,
+                fontSize: 13, cursor: verifyLoading ? "not-allowed" : "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              {verifyLoading ? "Verifying..." : "Verify Assignments"}
+            </button>
             <button
               onClick={() => {
                 const todayStr = new Date().toISOString().split("T")[0];
@@ -424,6 +457,44 @@ export default function Dashboard() {
               )}
             </div>
             <button onClick={() => setGrabResult(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
+          </div>
+        )}
+
+        {/* Verify Assignments Result Banner */}
+        {verifyResult && (
+          <div style={{
+            background: (verifyResult.job2?.mismatches ?? 0) > 0 ? "#f97316" + "22" : "#22d3ee22",
+            border: `1px solid ${(verifyResult.job2?.mismatches ?? 0) > 0 ? "#f97316" : "#22d3ee"}55`,
+            borderRadius: 10, padding: "14px 18px", marginBottom: 20,
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "#fff", fontSize: 14, marginBottom: 6 }}>
+                Verify Assignments
+              </div>
+              {verifyResult.job1 && (
+                <div style={{ color: "#94a3b8", fontSize: 13, marginBottom: 2 }}>
+                  Job 1 — Assignments: {verifyResult.job1.alreadyCorrect} correct, {verifyResult.job1.fixed} fixed
+                </div>
+              )}
+              {verifyResult.job2 && (
+                <div style={{ color: (verifyResult.job2.mismatches ?? 0) > 0 ? "#fb923c" : "#34d399", fontSize: 13 }}>
+                  Job 2 — OpenPhone sync: {verifyResult.job2.verifiedCorrect} verified, {verifyResult.job2.updated} updated
+                  {(verifyResult.job2.mismatches ?? 0) > 0 && ` · ⚠️ ${verifyResult.job2.mismatches} mismatches fixed`}
+                </div>
+              )}
+              {verifyResult.logs && verifyResult.logs.length > 0 && (
+                <details style={{ marginTop: 8 }}>
+                  <summary style={{ color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Details ({verifyResult.logs.length} entries)</summary>
+                  <div style={{ marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
+                    {verifyResult.logs.map((l, i) => (
+                      <div key={i} style={{ color: "#94a3b8", fontSize: 11, fontFamily: "monospace", marginBottom: 2 }}>{l}</div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+            <button onClick={() => setVerifyResult(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
           </div>
         )}
 

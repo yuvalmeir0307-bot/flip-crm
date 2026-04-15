@@ -5,6 +5,7 @@
     { "path": "/api/cron/drip", "schedule": "21 15 * * 3" },
     { "path": "/api/cron/drip", "schedule": "29 15 * * 4" },
     { "path": "/api/cron/check-duplicates", "schedule": "30 11 * * 1,2,3,4,5" },
-    { "path": "/api/cron/daily-report", "schedule": "0 12 * * 1,2,3,4,5" }
+    { "path": "/api/cron/daily-report", "schedule": "0 12 * * 1,2,3,4,5" },
+    { "path": "/api/agent-verify", "schedule": "15 15 * * 1,2,3,4" }
   ]
 }
