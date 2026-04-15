@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const fix = url.searchParams.get("fix") === "true";
+  // assignUnset: assign contacts with no OpenPhone history using phone-digit fallback (even=Yuval, odd=Yahav)
+  const assignUnset = url.searchParams.get("assignUnset") === "true";
   // Limit how many contacts we cross-check against OpenPhone (rate limit friendly)
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? parseInt(limitParam, 10) : 50;
@@ -101,6 +103,22 @@ export async function GET(req: NextRequest) {
         });
         row.fixed = true;
         row.notionAssignedTo = openPhoneSender;
+      } catch {
+        row.fixed = false;
+      }
+    }
+
+    // assignUnset: for contacts with no notion assignment AND no OpenPhone history,
+    // use the same phone-digit fallback the drip uses (deterministic, no flip-flop)
+    if (assignUnset && !notionKnown && !openPhoneSender && c.phone) {
+      const lastDigit = parseInt(c.phone.replace(/\D/g, "").slice(-1), 10);
+      const fallbackSender = lastDigit % 2 === 0 ? "Yuval" : "Yahav";
+      try {
+        await updateContact(c.id, {
+          "Assigned To": { rich_text: [{ text: { content: fallbackSender } }] },
+        });
+        row.fixed = true;
+        row.notionAssignedTo = fallbackSender;
       } catch {
         row.fixed = false;
       }
