@@ -1628,17 +1628,21 @@ function DealCard({ contact, onSave, onStatusChange, onMoveToPool }: {
               const isPast = i < currentIdx;
               return (
                 <div key={stage.key} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    flex: 1, textAlign: "center", fontSize: 9, fontWeight: 700,
-                    padding: "4px 4px", borderRadius: i === 0 ? "6px 0 0 6px" : i === DEAL_STAGES.length - 1 ? "0 6px 6px 0" : 0,
-                    background: isActive ? stage.color : isPast ? stage.color + "55" : "#1e1e1e",
-                    color: isActive ? "#000" : isPast ? stage.color : "#444",
-                    textTransform: "uppercase", letterSpacing: "0.04em",
-                    border: `1px solid ${isActive ? stage.color : isPast ? stage.color + "44" : "#2a2a2a"}`,
-                    borderRight: i < DEAL_STAGES.length - 1 ? "none" : undefined,
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    transition: "all 0.15s",
-                  }}>
+                  <div
+                    onClick={() => !isActive && onStatusChange(contact.id, stage.key)}
+                    style={{
+                      flex: 1, textAlign: "center", fontSize: 9, fontWeight: 700,
+                      padding: "4px 4px", borderRadius: i === 0 ? "6px 0 0 6px" : i === DEAL_STAGES.length - 1 ? "0 6px 6px 0" : 0,
+                      background: isActive ? stage.color : isPast ? stage.color + "55" : "#1e1e1e",
+                      color: isActive ? "#000" : isPast ? stage.color : "#444",
+                      textTransform: "uppercase", letterSpacing: "0.04em",
+                      border: `1px solid ${isActive ? stage.color : isPast ? stage.color + "44" : "#2a2a2a"}`,
+                      borderRight: i < DEAL_STAGES.length - 1 ? "none" : undefined,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      transition: "all 0.15s",
+                      cursor: isActive ? "default" : "pointer",
+                    }}
+                  >
                     {stage.label}
                   </div>
                 </div>
