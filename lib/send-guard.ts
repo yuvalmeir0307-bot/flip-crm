@@ -23,10 +23,10 @@ export function checkTimeWindow(): GuardResult {
   const now = new Date();
   const offset = usCentralOffset();
   const centralHour = ((now.getUTCHours() + offset) % 24 + 24) % 24;
-  if (centralHour < 9 || centralHour >= 20) {
+  if (centralHour < 9 || centralHour >= 15) {
     return {
       ok: false,
-      reason: `BLOCKED: Outside send window — US Central time is ${centralHour}:${String(now.getUTCMinutes()).padStart(2,"0")}. Allowed 09:00–20:00`,
+      reason: `BLOCKED: Outside send window — US Central time is ${centralHour}:${String(now.getUTCMinutes()).padStart(2,"0")}. Allowed 09:00–15:00`,
     };
   }
   return { ok: true };
