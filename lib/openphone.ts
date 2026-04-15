@@ -29,6 +29,43 @@ export function getSenderByName(name: string): string {
   return YUVAL_ID;
 }
 
+/**
+ * Queries OpenPhone message history to find which of our two numbers
+ * (Yuval or Yahav) most recently sent a message to a given contact phone.
+ * Returns null if no messages found on either line.
+ */
+export async function getRecentSenderForContact(
+  contactPhone: string
+): Promise<"Yuval" | "Yahav" | null> {
+  async function fetchLatestMsg(phoneNumberId: string): Promise<string | null> {
+    if (!phoneNumberId) return null;
+    try {
+      const res = await fetch(
+        `https://api.openphone.com/v1/messages?phoneNumberId=${encodeURIComponent(phoneNumberId)}&participants[]=${encodeURIComponent(contactPhone)}&maxResults=1`,
+        { headers: { Authorization: API_KEY } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const msgs: Array<{ createdAt?: string; direction?: string }> = data?.data ?? [];
+      // Only count outbound messages (messages we sent)
+      const outbound = msgs.filter((m) => m.direction === "outgoing" || m.direction === "out");
+      return outbound[0]?.createdAt ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  const [yuvalLatest, yahavLatest] = await Promise.all([
+    fetchLatestMsg(YUVAL_ID),
+    fetchLatestMsg(YAHAV_ID),
+  ]);
+
+  if (!yuvalLatest && !yahavLatest) return null;
+  if (!yuvalLatest) return "Yahav";
+  if (!yahavLatest) return "Yuval";
+  return yuvalLatest >= yahavLatest ? "Yuval" : "Yahav";
+}
+
 export async function alertBothPartners(message: string): Promise<void> {
   // Send from Yuval's line to both personal numbers
   const sender = YUVAL_ID;

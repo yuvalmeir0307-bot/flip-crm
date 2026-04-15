@@ -101,6 +101,14 @@ export async function GET(req: NextRequest) {
     const senderName = knownAgent ? (isYuval ? "Yuval" : "Yahav") : (phoneLastDigit % 2 === 0 ? "Yuval" : "Yahav");
     const senderPhone = knownAgent ? getSenderByName(contact.assignedTo) : getSender(phoneLastDigit % 2);
 
+    // Guard: if senderPhone is empty, the env var is not configured — abort rather than silently
+    // sending from the wrong number (OpenPhone falls back to default when 'from' is empty)
+    if (!senderPhone) {
+      const missingVar = senderName === "Yuval" ? "YUVAL_PHONE_ID" : "YAHAV_PHONE_ID";
+      logs.push(`❌ ${contact.name} — ${missingVar} env var is empty. Set it in Vercel → Settings → Environment Variables. Skipping to avoid sending from wrong number.`);
+      continue;
+    }
+
     const notionScript = notionScripts.find(
       (s) => s.campaign === (isPool ? "Pool" : "Drip") && s.step === currentStep
     );
@@ -113,7 +121,7 @@ export async function GET(req: NextRequest) {
 
     const delay = isPool ? getPoolDelay(currentStep) : getDripDelay(currentStep);
 
-    logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} - Step ${currentStep}`);
+    logs.push(`[${dryRun ? "DRY RUN" : "SEND"}] ${contact.name} (${contact.phone}) from ${senderName} [ID:…${senderPhone.slice(-4)}] - Step ${currentStep}`);
     logs.push(`Message: "${message}"`);
 
     // Run send guard — skip time window check on dry runs so testing works at any hour
