@@ -41,12 +41,15 @@ export function checkMessage(message: string): GuardResult {
 
 export function checkNotSentToday(lastContact: string | null): GuardResult {
   if (!lastContact) return { ok: true };
-  const todayIsrael = new Date(new Date().getTime() + 3 * 60 * 60 * 1000)
+  // Use Chicago time for date comparison — consistent with send window
+  const offset = usCentralOffset();
+  const now = new Date();
+  const todayChicago = new Date(now.getTime() + offset * 60 * 60 * 1000)
     .toISOString()
     .split("T")[0];
   const lastDate = lastContact.split("T")[0];
-  if (lastDate === todayIsrael) {
-    return { ok: false, reason: `BLOCKED: Already contacted today (${lastDate})` };
+  if (lastDate === todayChicago) {
+    return { ok: false, reason: `BLOCKED: Already contacted today (${lastDate} Chicago time)` };
   }
   return { ok: true };
 }

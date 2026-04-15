@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (dryRun) {
-      logs.push(`Would update: step → ${isPool ? "Pool " + (currentStep >= 9 ? 1 : currentStep + 1) : currentStep >= 4 ? "Drip 0 (restart in 60 days)" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
+      logs.push(`Would update: step → ${isPool ? "Pool " + (currentStep >= 9 ? 1 : currentStep + 1) : currentStep >= 4 ? "→ The Pool (Step 1, +7 days)" : "Drip " + (currentStep + 1)}, next date in ${delay} days`);
       continue;
     }
 

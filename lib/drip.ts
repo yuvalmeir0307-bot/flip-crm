@@ -32,5 +32,10 @@ export function getPoolDelay(step: number): number {
 export function calculateNextDate(days: number): string {
   const next = new Date();
   next.setDate(next.getDate() + days);
+  // Never schedule on Fri/Sat/Sun — cron only runs Mon–Thu
+  const dow = next.getUTCDay(); // 0=Sun, 1=Mon, 5=Fri, 6=Sat
+  if (dow === 5) next.setDate(next.getDate() + 3); // Fri → Mon
+  if (dow === 6) next.setDate(next.getDate() + 2); // Sat → Mon
+  if (dow === 0) next.setDate(next.getDate() + 1); // Sun → Mon
   return next.toISOString().split("T")[0];
 }
