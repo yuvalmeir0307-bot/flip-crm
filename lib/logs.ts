@@ -11,7 +11,6 @@ export type LogType =
   | "DAILY_REPORT"
   | "SMS_SENT"
   | "DRIP_TRIGGER"
-  | "MISSED_CALL"
   | "INFO";
 
 export type LogEntry = {
