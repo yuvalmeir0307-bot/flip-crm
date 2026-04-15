@@ -2039,6 +2039,7 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"opportunities" | "insights">("opportunities");
   const [teamFilter, setTeamFilter] = useState<"All" | "Yahav" | "Yuval">("All");
+  const [pendingStatus, setPendingStatus] = useState<{ id: string; toStatus: string; label: string; isPoolMove?: boolean } | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -2056,23 +2057,35 @@ export default function OpportunitiesPage() {
     setLoading(false);
   }
 
-  async function handleStatusChange(id: string, status: string) {
-    await fetch("/api/contacts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-    setContacts((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
+  function handleStatusChange(id: string, status: string) {
+    const contact = contacts.find(c => c.id === id);
+    const name = contact?.name ?? "this contact";
+    setPendingStatus({ id, toStatus: status, label: `Move ${name} → ${status}?` });
   }
 
-  // Move a Potential Deal back to The Pool at step 5 (long-term relationship stage)
-  async function handleMoveBackToPool(id: string) {
+  function handleMoveBackToPool(id: string) {
+    const contact = contacts.find(c => c.id === id);
+    const name = contact?.name ?? "this contact";
+    setPendingStatus({ id, toStatus: "The Pool", label: `Move ${name} → The Pool?`, isPoolMove: true });
+  }
+
+  async function confirmStatusChange() {
+    if (!pendingStatus) return;
+    const { id, toStatus, isPoolMove } = pendingStatus;
+    const goingToPool = toStatus === "The Pool";
+    const body: Record<string, unknown> = { id, status: toStatus };
+    if (goingToPool) body.followUpDate = null;
+    if (isPoolMove) body.poolStep = 5;
     await fetch("/api/contacts", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "The Pool", poolStep: 5 }),
+      body: JSON.stringify(body),
     });
-    setContacts((prev) => prev.filter((c) => c.id !== id));
+    setContacts((prev) => goingToPool
+      ? prev.filter((c) => c.id !== id)
+      : prev.map((c) => c.id === id ? { ...c, status: toStatus } : c)
+    );
+    setPendingStatus(null);
   }
 
   async function handleSave(id: string, data: Partial<Contact>) {
@@ -2098,6 +2111,53 @@ export default function OpportunitiesPage() {
   return (
     <div className="app-root">
       <Sidebar />
+
+      {/* Status Change Confirmation Modal */}
+      {pendingStatus && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        }}>
+          <div style={{
+            background: "#1a1a1a", borderRadius: 14, padding: 28, maxWidth: 380, width: "90%",
+            border: "1px solid #333", boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ fontSize: 20, marginBottom: 8 }}>
+              {pendingStatus.toStatus === "The Pool" ? "🏊" : pendingStatus.toStatus === "Graveyard" ? "⚰️" : "📋"}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#f5f5f5", marginBottom: 8 }}>
+              {pendingStatus.label}
+            </div>
+            {pendingStatus.toStatus === "The Pool" && (
+              <div style={{ fontSize: 12, color: "#f97316", marginBottom: 16, background: "#f9731611", borderRadius: 8, padding: "8px 12px" }}>
+                ⚠️ Follow-up date will be cleared. Set a new one after moving.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                onClick={() => setPendingStatus(null)}
+                style={{
+                  flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #333",
+                  background: "#111", color: "#888", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                style={{
+                  flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
+                  background: pendingStatus.toStatus === "Graveyard" ? "#ef4444" : pendingStatus.toStatus === "The Pool" ? "#6366f1" : "#10b981",
+                  color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="app-main">
 
         {/* Header */}
