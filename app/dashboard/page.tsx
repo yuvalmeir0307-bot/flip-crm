@@ -76,7 +76,9 @@ export default function Dashboard() {
   const [activeAlerts, setActiveAlerts] = useState<AlertEntry[]>([]);
   const [runLogs, setRunLogs] = useState<RunLog[]>([]);
   const [verifyLoading, setVerifyLoading] = useState(false);
-  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; job1?: { fixed: number; alreadyCorrect: number }; job2?: { updated: number; mismatches: number; verifiedCorrect: number }; logs?: string[] } | null>(null);
+  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; job1?: { fixed: number; alreadyCorrect: number }; job2?: { updated: number; mismatches: number; verifiedCorrect: number; openPhoneSynced: number; openPhoneVerifyFailed: number }; logs?: string[] } | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; total?: number; created?: number; updated?: number; skipped?: number; errors?: number; verifyFailed?: number; logs?: string[] } | null>(null);
 
   const DEFAULT_GOALS = {
     yuval: [
@@ -133,6 +135,23 @@ export default function Dashboard() {
       setGrabResult({ person, added: [], skipped: [], errors: ["Network error"] });
     } finally {
       setGrabLoading((prev) => ({ ...prev, [person]: false }));
+    }
+  }
+
+  async function runSyncAllContacts() {
+    setSyncLoading(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/sync-all-contacts", {
+        method: "POST",
+        headers: { "x-dashboard-trigger": "1" },
+      });
+      const data = await res.json();
+      setSyncResult(data);
+    } catch {
+      setSyncResult({ ok: false, logs: ["Network error"] });
+    } finally {
+      setSyncLoading(false);
     }
   }
 
@@ -294,6 +313,20 @@ export default function Dashboard() {
                 {grabLoading[person] ? `Grabbing ${person}...` : `Grab Agents → ${person}`}
               </button>
             ))}
+            <button
+              onClick={runSyncAllContacts}
+              disabled={syncLoading}
+              style={{
+                background: syncLoading ? "#1a1a1a" : "#0f172a",
+                color: syncLoading ? "#555" : "#34d399",
+                border: "1px solid #34d39944",
+                borderRadius: 10, padding: "11px 18px", fontWeight: 700,
+                fontSize: 13, cursor: syncLoading ? "not-allowed" : "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              {syncLoading ? "Syncing..." : "Sync → OpenPhone"}
+            </button>
             <button
               onClick={runAgentVerify}
               disabled={verifyLoading}
@@ -457,6 +490,46 @@ export default function Dashboard() {
               )}
             </div>
             <button onClick={() => setGrabResult(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
+          </div>
+        )}
+
+        {/* Sync to OpenPhone Result Banner */}
+        {syncResult && (
+          <div style={{
+            background: (syncResult.verifyFailed ?? 0) > 0 || (syncResult.errors ?? 0) > 0 ? "#f9731622" : "#34d39922",
+            border: `1px solid ${(syncResult.verifyFailed ?? 0) > 0 || (syncResult.errors ?? 0) > 0 ? "#f97316" : "#34d399"}55`,
+            borderRadius: 10, padding: "14px 18px", marginBottom: 20,
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "#fff", fontSize: 14, marginBottom: 6 }}>
+                Sync → OpenPhone (Agent Milwaukee)
+              </div>
+              <div style={{ color: "#94a3b8", fontSize: 13, marginBottom: 2 }}>
+                {syncResult.total ?? 0} contacts total · {syncResult.created ?? 0} created · {syncResult.updated ?? 0} updated · {syncResult.skipped ?? 0} already correct
+              </div>
+              {(syncResult.verifyFailed ?? 0) > 0 && (
+                <div style={{ color: "#fb923c", fontSize: 13 }}>
+                  ⚠️ {syncResult.verifyFailed} name verifications failed (check logs)
+                </div>
+              )}
+              {(syncResult.errors ?? 0) > 0 && (
+                <div style={{ color: "#f87171", fontSize: 13 }}>
+                  ✗ {syncResult.errors} errors
+                </div>
+              )}
+              {syncResult.logs && syncResult.logs.length > 0 && (
+                <details style={{ marginTop: 8 }}>
+                  <summary style={{ color: "#6b7280", fontSize: 12, cursor: "pointer" }}>Details ({syncResult.logs.length} entries)</summary>
+                  <div style={{ marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
+                    {syncResult.logs.map((l, i) => (
+                      <div key={i} style={{ color: "#94a3b8", fontSize: 11, fontFamily: "monospace", marginBottom: 2 }}>{l}</div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+            <button onClick={() => setSyncResult(null)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, cursor: "pointer" }}>✕</button>
           </div>
         )}
 
