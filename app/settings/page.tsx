@@ -38,8 +38,8 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 // ── Alert helpers ────────────────────────────────────────────────────────────
 function getBlockReason(details: string): string {
   if (details.includes("Outside send window")) {
-    const match = details.match(/Israel time is (\d+:\d+)/);
-    return match ? `שליחה בשעה ${match[1]} ישראל (מחוץ ל-09:00–18:00)` : "שליחה מחוץ לשעות מורשות";
+    const match = details.match(/Central time is (\d+:\d+)/);
+    return match ? `שליחה בשעה ${match[1]} שיקגו (מחוץ ל-09:00–15:00)` : "שליחה מחוץ לשעות מורשות";
   }
   if (details.includes("Already contacted today")) return "קונטקט כבר קיבל הודעה היום";
   if (details.includes("empty or too short")) return "סקריפט חסר ב-Notion לשלב הזה";
@@ -664,7 +664,7 @@ export default function SettingsPage() {
                         <tbody>
                           {/* ── DEMO ROWS (example only) ── */}
                           {([
-                            { contact: "John Smith", phone: "+14141234567", reason: "שליחה בשעה 20:05 ישראל (מחוץ ל-09:00–18:00)", fix: "בדוק vercel.json — הכרון רץ בשעה לא נכונה", time: "Apr 13 20:05" },
+                            { contact: "John Smith", phone: "+14141234567", reason: "שליחה בשעה 16:05 שיקגו (מחוץ ל-09:00–15:00)", fix: "בדוק vercel.json — הכרון רץ בשעה לא נכונה", time: "Apr 13 16:05" },
                             { contact: "Sara Lee",   phone: "+14142345678", reason: "קונטקט כבר קיבל הודעה היום",                   fix: "תקין — ממתין ליום הבא",                         time: "Apr 13 10:13" },
                             { contact: "Mike B.",    phone: "+14143456789", reason: "סקריפט חסר ב-Notion לשלב הזה",                 fix: "הוסף סקריפט ב-Notion Scripts עבור השלב הזה", time: "Apr 13 10:21" },
                           ] as { contact: string; phone: string; reason: string; fix: string; time: string }[]).map((d, i) => (
