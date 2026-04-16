@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveContacts, updateContact, extractContactProps, createRunLog } from "@/lib/notion";
 import { sendSMS, getSender, getSenderByName } from "@/lib/openphone";
+import { syncContactToOpenPhone } from "@/skills/syncContactToOpenPhone";
 
 export const maxDuration = 300; // Allow up to 5 minutes for large contact lists
 import {
@@ -199,6 +200,20 @@ export async function GET(req: NextRequest) {
           "Assigned To": { rich_text: [{ text: { content: senderName } }] },
         }).catch(() => {});
       }
+
+      // Auto-sync to OpenPhone on first drip touch (step 0) so the contact
+      // shows their name in OpenPhone conversations immediately after outreach starts.
+      // Also runs for both Yuval and Yahav — assignment is irrelevant, same contact record.
+      if (!isPool && currentStep === 0 && contact.name && contact.phone) {
+        syncContactToOpenPhone(contact.phone, contact.name)
+          .then((r) => {
+            if (r.action !== "skipped") {
+              logs.push(`📇 OpenPhone sync: ${contact.name} → ${r.action} [${r.verified ? "✓ verified" : "✗ failed"}]`);
+            }
+          })
+          .catch(() => {}); // non-blocking — never crash the drip
+      }
+
       logs.push(`✅ Sent & updated Notion`);
     } else {
       logs.push(`❌ Failed: ${result.error}`);
