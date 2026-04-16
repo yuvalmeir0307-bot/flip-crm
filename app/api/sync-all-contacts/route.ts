@@ -65,12 +65,12 @@ export async function POST(req: NextRequest) {
 
     if (result.action === "created") {
       created++;
-      const vTag = result.verified ? "✓ verified" : "✗ verify failed";
+      const vTag = result.verified ? "✓ name+phone verified" : `✗ verify failed (phone:${result.hasPhone})`;
       logs.push(`CREATED: ${c.name} (${c.phone}) → "${result.storedName}" [${vTag}]`);
       if (!result.verified) verifyFailed++;
     } else if (result.action === "updated") {
       updated++;
-      const vTag = result.verified ? "✓ verified" : "✗ verify failed";
+      const vTag = result.verified ? "✓ name+phone verified" : `✗ verify failed (phone:${result.hasPhone})`;
       logs.push(`UPDATED: ${c.name} (${c.phone}) → "${result.storedName}" [${vTag}]`);
       if (!result.verified) verifyFailed++;
     } else if (result.action === "skipped") {
