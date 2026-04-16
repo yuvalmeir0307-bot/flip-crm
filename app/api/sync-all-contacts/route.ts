@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   const title = `SYNC_ALL_CONTACTS — ${created} created, ${updated} updated, ${verifyFailed} verify-failed`;
   await createLog(
     title,
-    verifyFailed > 0 || errors > 0 ? "WARN" : "INFO",
+    verifyFailed > 0 || errors > 0 ? "FAILED_SMS" : "INFO",
     undefined,
     JSON.stringify({ ...summary, sampleLogs: logs.slice(0, 40) }).substring(0, 2000)
   );

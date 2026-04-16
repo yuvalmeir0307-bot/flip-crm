@@ -251,7 +251,7 @@ async function handler(req: NextRequest) {
   const hasWarnings = (j2?.mismatches ?? 0) > 0 || (j2?.openPhoneVerifyFailed ?? 0) > 0;
   await createLog(
     `AGENT_VERIFY — ${summary}`,
-    hasWarnings ? "WARN" : "INFO",
+    hasWarnings ? "FAILED_SMS" : "INFO",
     undefined,
     JSON.stringify({ ...result, logs: allLogs.slice(0, 50) }).substring(0, 2000)
   );
