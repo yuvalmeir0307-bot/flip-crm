@@ -548,6 +548,329 @@ const DISCOVERY_STEPS: DiscoveryStep[] = [
   { num: 7, text: "Ask timeline.", sub: [] },
 ];
 
+function PoolCard({ contact, onStatusChange, onSave }: {
+  contact: Contact;
+  onStatusChange: (id: string, status: string) => void;
+  onSave: (id: string, data: Partial<Contact>) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+  const [editingDate, setEditingDate] = useState(false);
+  const [localDate, setLocalDate] = useState(contact.followUpDate ?? "");
+  const todayStr = new Date().toISOString().split("T")[0];
+  const isOverdue = contact.followUpDate && contact.followUpDate < todayStr;
+  const isToday = contact.followUpDate === todayStr;
+
+  return (
+    <div style={{
+      background: "#1a1a1a", borderRadius: 14,
+      border: isOverdue ? "1px solid #ef444433" : "1px solid #a855f733",
+      boxShadow: isOverdue ? "0 4px 20px rgba(239,68,68,0.08)" : "0 4px 20px rgba(168,85,247,0.06)",
+      overflow: "hidden",
+    }}>
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.brokerage || contact.phone}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {contact.followUpDate && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: isOverdue ? "#ef4444" : isToday ? "#facc15" : "#34d399" }}>
+              {isOverdue ? "⚠️ " : "🗓 "}{new Date(contact.followUpDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+          )}
+          <WarmthBadge level={contact.warmth} />
+          <span style={{ fontSize: 16, color: "#a855f7", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.2s", display: "inline-block" }}>›</span>
+        </div>
+      </div>
+      {!collapsed && (
+        <div style={{ borderTop: "1px solid #a855f733", padding: "12px 16px" }}>
+          {contact.lastReply && (
+            <div style={{ fontSize: 12, color: "#888", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4, background: "#a855f711", borderRadius: 8, padding: "8px 12px" }}>
+              &ldquo;{contact.lastReply.replace(/^\[.*?\]\s*/, "").slice(0, 140)}{contact.lastReply.length > 140 ? "..." : ""}&rdquo;
+            </div>
+          )}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Follow-up date</div>
+            {editingDate ? (
+              <div style={{ display: "flex", gap: 6 }}>
+                <input type="date" value={localDate} onChange={e => setLocalDate(e.target.value)}
+                  style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, background: "#111", border: "1px solid #a855f744", color: "#fff", flex: 1 }} />
+                <button onClick={() => { onSave(contact.id, { followUpDate: localDate || null }); setEditingDate(false); }}
+                  style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, background: "#a855f7", border: "none", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+                  Save
+                </button>
+                <button onClick={() => setEditingDate(false)}
+                  style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#2a2a2a", border: "1px solid #333", color: "#888", cursor: "pointer" }}>
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setEditingDate(true)}
+                style={{ fontSize: 12, color: contact.followUpDate ? (isOverdue ? "#ef4444" : isToday ? "#facc15" : "#34d399") : "#555", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                {contact.followUpDate ? `${isOverdue ? "⚠️ Overdue: " : "🗓 "}${contact.followUpDate}` : "+ Set follow-up date"}
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={() => onStatusChange(contact.id, "Replied from Pool")}
+              style={{ fontSize: 12, padding: "6px 14px", borderRadius: 8, background: "#6366f1", color: "#fff", border: "none", fontWeight: 700, cursor: "pointer" }}
+            >
+              ✓ They Replied
+            </button>
+            <a href={`sms:${contact.phone}`}
+              style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744", textDecoration: "none", fontWeight: 600 }}>
+              💬 Message
+            </a>
+            <button
+              onClick={() => onStatusChange(contact.id, "Potential Deal")}
+              style={{ fontSize: 12, padding: "6px 12px", borderRadius: 8, background: "#10b98122", color: "#34d399", border: "1px solid #10b98144", cursor: "pointer", fontWeight: 600 }}
+            >
+              → Deal
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RepliedPoolCard({ contact, onStatusChange, onSave }: {
+  contact: Contact;
+  onStatusChange: (id: string, status: string) => void;
+  onSave: (id: string, data: Partial<Contact>) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+  const [analysis, setAnalysis] = useState<DiscoveryAnalysis | null>(null);
+  const [analyzeState, setAnalyzeState] = useState<"idle" | "loading" | "done" | "error" | "manual">("idle");
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [analyzeCallMeta, setAnalyzeCallMeta] = useState<{ duration: number; answeredAt: string } | null>(null);
+  const [manualTranscript, setManualTranscript] = useState("");
+  const [notes, setNotes] = useState(contact.notes ?? "");
+  const [warmth, setWarmth] = useState(contact.warmth ?? "");
+  const [followUpDate, setFollowUpDate] = useState(contact.followUpDate ?? "");
+  const [editingDate, setEditingDate] = useState(false);
+  const [callState, setCallState] = useState<"idle" | "confirm" | "calling" | "done" | "error">("idle");
+  const [callError, setCallError] = useState("");
+  const [msgState, setMsgState] = useState<"idle" | "confirm">("idle");
+  const [saving, setSaving] = useState(false);
+  const color = "#6366f1";
+
+  async function analyzeCall() {
+    setAnalyzeState("loading");
+    try {
+      const callRes = await fetch(`/api/calls?phone=${encodeURIComponent(contact.phone)}`);
+      const callData = await callRes.json();
+      if (!callData.recording) { setAnalyzeState("manual"); return; }
+      const res = await fetch("/api/analyze-call", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordingUrl: callData.recording, phone: contact.phone, type: "discovery" }),
+      });
+      const data = await res.json();
+      if (data.analysis) { setAnalysis(data.analysis); setAnalyzeCallMeta(callData.meta ?? null); setAnalyzeState("done"); }
+      else { setAnalyzeState("error"); setAnalyzeError(data.error ?? "Analysis failed"); }
+    } catch { setAnalyzeState("error"); setAnalyzeError("Network error"); }
+  }
+
+  async function analyzeManualTranscript() {
+    setAnalyzeState("loading");
+    try {
+      const res = await fetch("/api/analyze-call", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: manualTranscript, phone: contact.phone, type: "discovery" }),
+      });
+      const data = await res.json();
+      if (data.analysis) { setAnalysis(data.analysis); setAnalyzeState("done"); }
+      else { setAnalyzeState("error"); setAnalyzeError(data.error ?? "Analysis failed"); }
+    } catch { setAnalyzeState("error"); setAnalyzeError("Network error"); }
+  }
+
+  async function initiateCall() {
+    setCallState("calling");
+    try {
+      const res = await fetch("/api/call", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: contact.phone }),
+      });
+      const data = await res.json();
+      if (data.ok) { setCallState("done"); setTimeout(() => setCallState("idle"), 4000); }
+      else { setCallState("error"); setCallError(data.error ?? "Call failed"); setTimeout(() => setCallState("idle"), 4000); }
+    } catch { setCallState("error"); setCallError("Network error"); setTimeout(() => setCallState("idle"), 4000); }
+  }
+
+  return (
+    <>
+    {analyzeState === "done" && analysis && (
+      <AnalysisModal
+        analysis={analysis}
+        contactName={contact.name}
+        callMeta={analyzeCallMeta ?? undefined}
+        onClose={() => setAnalyzeState("idle")}
+        onSave={(newWarmth, newNotes) => {
+          setWarmth(newWarmth);
+          setNotes((prev) => newNotes + (prev ? "\n\n" + prev : ""));
+          onSave(contact.id, { warmth: newWarmth, notes: newNotes + (notes ? "\n\n" + notes : "") });
+        }}
+      />
+    )}
+    <div style={{
+      background: "#1a1a1a", borderRadius: 14,
+      border: `1px solid ${color}22`,
+      boxShadow: `0 4px 20px rgba(99,102,241,0.08)`,
+      overflow: "hidden",
+    }}>
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{contact.phone}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <WarmthBadge level={warmth} />
+          {followUpDate && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: new Date(followUpDate) < new Date(new Date().toDateString()) ? "#ef4444" : new Date(followUpDate).toDateString() === new Date().toDateString() ? "#facc15" : "#34d399" }}>
+              🗓 {new Date(followUpDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+          )}
+          <span style={{ background: `${color}22`, color: "#a5b4fc", border: `1px solid ${color}44`, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>Pool Reply</span>
+          <span style={{ fontSize: 16, color, transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.2s", display: "inline-block" }}>›</span>
+        </div>
+      </div>
+      {!collapsed && (
+        <div style={{ borderTop: `1px solid ${color}22`, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{contact.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                <span style={{ fontSize: 12, color: "#666" }}>{contact.phone}</span>
+                {callState === "idle" && (
+                  <button onClick={() => setCallState("confirm")} style={{ background: "#0ea5e922", color: "#38bdf8", border: "1px solid #0ea5e944", borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>📞 Call</button>
+                )}
+                {callState === "confirm" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "#a5b4fc", fontWeight: 600 }}>Call {contact.name.split(" ")[0]}?</span>
+                    <button onClick={initiateCall} style={{ background: color, color: "#fff", border: "none", borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+                    <button onClick={() => setCallState("idle")} style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </span>
+                )}
+                {callState === "calling" && <span style={{ fontSize: 11, color }}>📞 Calling...</span>}
+                {callState === "done" && <span style={{ fontSize: 11, color: "#10b981" }}>✓ Call initiated</span>}
+                {callState === "error" && <span style={{ fontSize: 11, color: "#ef4444" }} title={callError}>✗ Failed</span>}
+                {msgState === "idle" && (
+                  <button onClick={() => setMsgState("confirm")} style={{ background: "#10b98122", color: "#34d399", border: "1px solid #10b98144", borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>💬 Message</button>
+                )}
+                {msgState === "confirm" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <a href={`sms:${contact.phone}`} onClick={() => setMsgState("idle")} style={{ background: "#10b981", color: "#000", borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>Confirm</a>
+                    <button onClick={() => setMsgState("idle")} style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          {(contact.brokerage || contact.area) && (
+            <div style={{ fontSize: 12, color: "#555", marginBottom: 10 }}>
+              {contact.brokerage && <span>🏢 {contact.brokerage}</span>}
+              {contact.brokerage && contact.area && <span> · </span>}
+              {contact.area && <span>📍 {contact.area}</span>}
+            </div>
+          )}
+          {contact.lastReply && (
+            <div style={{ fontSize: 12, color: "#888", fontStyle: "italic", marginBottom: 12, background: `${color}11`, borderRadius: 8, padding: "8px 12px", lineHeight: 1.4 }}>
+              &ldquo;{contact.lastReply.replace(/^\[.*?\]\s*/, "")}&rdquo;
+            </div>
+          )}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>Warmth</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {WARMTH_OPTIONS.map(w => (
+                <button key={w} onClick={() => setWarmth(w)}
+                  style={{ padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    background: warmth === w ? WARMTH_COLORS[w]?.bg : "#111",
+                    color: warmth === w ? WARMTH_COLORS[w]?.text : "#444",
+                    border: `1px solid ${warmth === w ? WARMTH_COLORS[w]?.border : "#222"}` }}>
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Follow-up date</div>
+            {editingDate ? (
+              <div style={{ display: "flex", gap: 6 }}>
+                <input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)}
+                  style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, background: "#111", border: `1px solid ${color}44`, color: "#fff", flex: 1 }} />
+                <button onClick={() => setEditingDate(false)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#2a2a2a", border: "1px solid #333", color: "#888", cursor: "pointer" }}>Done</button>
+              </div>
+            ) : (
+              <button onClick={() => setEditingDate(true)} style={{ fontSize: 12, color: followUpDate ? (new Date(followUpDate) < new Date(new Date().toDateString()) ? "#ef4444" : "#facc15") : "#555", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                {followUpDate ? `🗓 ${followUpDate}` : "+ Set follow-up date"}
+              </button>
+            )}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Notes</div>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+              style={{ width: "100%", fontSize: 12, padding: "8px 10px", borderRadius: 8, background: "#111", border: `1px solid ${color}33`, color: "#fff", resize: "vertical", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              onClick={async () => { setSaving(true); await onSave(contact.id, { warmth, notes, followUpDate: followUpDate || null }); setSaving(false); }}
+              style={{ background: color, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+            <button
+              onClick={() => onStatusChange(contact.id, "Potential Deal")}
+              style={{ background: "#10b98122", color: "#34d399", border: "1px solid #10b98144", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >
+              → Potential Deal
+            </button>
+            <button
+              onClick={() => onStatusChange(contact.id, "The Pool")}
+              style={{ background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >
+              ↩ Back to Pool
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {analyzeState === "idle" && (
+              <button onClick={analyzeCall} style={{ background: `${color}22`, color: "#a5b4fc", border: `1px solid ${color}44`, borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                🧠 Analyze Discovery Call
+              </button>
+            )}
+            {analyzeState === "loading" && <span style={{ fontSize: 12, color: "#a5b4fc", alignSelf: "center" }}>⏳ Analyzing...</span>}
+            {analyzeState === "error" && <span style={{ fontSize: 12, color: "#f87171", alignSelf: "center" }}>✗ {analyzeError}</span>}
+            {analyzeState === "manual" && (
+              <div style={{ width: "100%" }}>
+                <div style={{ fontSize: 11, color: "#a5b4fc", marginBottom: 6 }}>No recording found. Paste call notes:</div>
+                <textarea value={manualTranscript} onChange={e => setManualTranscript(e.target.value)} rows={4}
+                  style={{ width: "100%", fontSize: 12, padding: "8px 10px", borderRadius: 8, background: "#111", border: `1px solid ${color}44`, color: "#fff", resize: "vertical", fontFamily: "inherit", marginBottom: 8 }} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={analyzeManualTranscript} disabled={!manualTranscript.trim()}
+                    style={{ background: color, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: manualTranscript.trim() ? "pointer" : "not-allowed", opacity: manualTranscript.trim() ? 1 : 0.5 }}>
+                    Analyze Notes
+                  </button>
+                  <button onClick={() => { setAnalyzeState("idle"); setManualTranscript(""); }}
+                    style={{ background: "#2a2a2a", color: "#888", border: "1px solid #333", borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+    </>
+  );
+}
+
 function HotCard({ contact, onStatusChange, onSave }: {
   contact: Contact;
   onStatusChange: (id: string, status: string) => void;
@@ -2051,8 +2374,9 @@ export default function OpportunitiesPage() {
     const todayStr = new Date().toISOString().split("T")[0];
     setContacts(all.filter((c) =>
       c.status === "Replied" ||
-      c.status === "Potential Deal" ||
-      (c.status === "The Pool" && c.followUpDate && c.followUpDate <= todayStr)
+      c.status === "The Pool" ||
+      c.status === "Replied from Pool" ||
+      c.status === "Potential Deal"
     ));
     setLoading(false);
   }
@@ -2098,10 +2422,10 @@ export default function OpportunitiesPage() {
   }
 
   const filteredByTeam = teamFilter === "All" ? contacts : contacts.filter((c) => c.assignedTo === teamFilter);
-  const hotContacts = filteredByTeam.filter((c) => c.status === "Replied");
+  const dripContacts = filteredByTeam.filter((c) => c.status === "Replied");
+  const poolContacts = filteredByTeam.filter((c) => c.status === "The Pool");
+  const repliedPoolContacts = filteredByTeam.filter((c) => c.status === "Replied from Pool");
   const dealContacts = filteredByTeam.filter((c) => c.status === "Potential Deal");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const poolFollowUps = filteredByTeam.filter((c) => c.status === "The Pool" && c.followUpDate && c.followUpDate <= todayStr);
 
   const TABS = [
     { key: "opportunities" as const, label: "Opportunities" },
@@ -2164,7 +2488,7 @@ export default function OpportunitiesPage() {
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827" }}>Opportunities</h1>
           <p style={{ fontSize: 14, color: "#6b7280", marginTop: 2 }}>
-            {contacts.filter(c => c.status === "Replied").length} replied · {dealContacts.length} potential deals
+            {contacts.filter(c => c.status === "Replied").length} drip replies · {contacts.filter(c => c.status === "The Pool").length} in pool · {contacts.filter(c => c.status === "Replied from Pool").length} pool replies · {dealContacts.length} potential deals
           </p>
         </div>
 
@@ -2224,23 +2548,14 @@ export default function OpportunitiesPage() {
 
           <div className="opportunities-columns">
 
-            {/* Replied (from drip campaign) */}
+            {/* Column 1: Replied from Drip */}
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <div style={{
-                  width: 10, height: 10, borderRadius: "50%", background: "#f97316",
-                  boxShadow: "0 0 8px #f97316",
-                }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Replied
-                </span>
-                <span style={{
-                  background: "#f9731622", color: "#fb923c",
-                  borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600,
-                }}>
-                  {hotContacts.length}
-                </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f97316", boxShadow: "0 0 8px #f97316" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.06em" }}>Replied from Drip</span>
+                <span style={{ background: "#f9731622", color: "#fb923c", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{dripContacts.length}</span>
               </div>
+              <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Recruitment phase → move to Pool</div>
               <ScriptPanel title="גיוס מתווכים — Recruitment Script" accentColor="#f97316">
                 <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                   {HOT_SCRIPT_LINES.map((line, i) => {
@@ -2282,41 +2597,51 @@ export default function OpportunitiesPage() {
               </ScriptPanel>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {hotContacts.length === 0 ? (
+                {dripContacts.length === 0 ? (
                   <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
-                    No hot leads right now
+                    No drip replies right now
                   </div>
-                ) : hotContacts.map((c) => (
+                ) : dripContacts.map((c) => (
                   <HotCard key={c.id} contact={c} onStatusChange={handleStatusChange} onSave={handleSave} />
                 ))}
               </div>
             </div>
 
-            {/* Potential Deal */}
+            {/* Column 2: The Pool */}
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <div style={{
-                  width: 10, height: 10, borderRadius: "50%", background: "#10b981",
-                  boxShadow: "0 0 8px #10b981",
-                }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Potential Deal
-                </span>
-                <span style={{
-                  background: "#10b98122", color: "#34d399",
-                  borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600,
-                }}>
-                  {dealContacts.length}
-                </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#a855f7", boxShadow: "0 0 8px #a855f7" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a855f7", textTransform: "uppercase", letterSpacing: "0.06em" }}>The Pool</span>
+                <span style={{ background: "#a855f722", color: "#c084fc", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{poolContacts.length}</span>
               </div>
-              <ScriptPanel title="1st Discovery Call Script" accentColor="#10b981">
+              <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Nurturing → click "They Replied" to advance</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {poolContacts.length === 0 ? (
+                  <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
+                    Pool is empty
+                  </div>
+                ) : poolContacts.map((c) => (
+                  <PoolCard key={c.id} contact={c} onStatusChange={handleStatusChange} onSave={handleSave} />
+                ))}
+              </div>
+            </div>
+
+            {/* Column 3: Replied from Pool */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#6366f1", boxShadow: "0 0 8px #6366f1" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: "0.06em" }}>Replied from Pool</span>
+                <span style={{ background: "#6366f122", color: "#a5b4fc", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{repliedPoolContacts.length}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Discovery call → move to Potential Deal</div>
+              <ScriptPanel title="1st Discovery Call Script" accentColor="#6366f1">
                 <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
                   {DISCOVERY_STEPS.map((step) => (
                     <div key={step.num}>
                       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                         <span style={{
                           minWidth: 20, height: 20, borderRadius: "50%",
-                          background: "#10b98133", color: "#34d399",
+                          background: "#6366f133", color: "#a5b4fc",
                           fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                           flexShrink: 0, marginTop: 1,
                         }}>{step.num}</span>
@@ -2328,7 +2653,7 @@ export default function OpportunitiesPage() {
                         <div style={{ marginLeft: 28, marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
                           {step.sub.map((s, si) => (
                             <div key={si} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                              <span style={{ color: "#10b981", fontSize: 11, marginTop: 2, flexShrink: 0 }}>›</span>
+                              <span style={{ color: "#6366f1", fontSize: 11, marginTop: 2, flexShrink: 0 }}>›</span>
                               <span style={{ fontSize: 12, color: s.bold ? "#fff" : "#999", fontWeight: s.bold ? 700 : 400, lineHeight: 1.5 }}>
                                 {s.text}
                               </span>
@@ -2340,7 +2665,25 @@ export default function OpportunitiesPage() {
                   ))}
                 </div>
               </ScriptPanel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {repliedPoolContacts.length === 0 ? (
+                  <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
+                    No pool replies yet
+                  </div>
+                ) : repliedPoolContacts.map((c) => (
+                  <RepliedPoolCard key={c.id} contact={c} onStatusChange={handleStatusChange} onSave={handleSave} />
+                ))}
+              </div>
+            </div>
 
+            {/* Column 4: Potential Deal */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.06em" }}>Potential Deal</span>
+                <span style={{ background: "#10b98122", color: "#34d399", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{dealContacts.length}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Underwriting → Offer → Counter → Signed</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {dealContacts.length === 0 ? (
                   <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 24, color: "#444", fontSize: 13, textAlign: "center" }}>
@@ -2353,58 +2696,6 @@ export default function OpportunitiesPage() {
             </div>
 
           </div>
-
-          {/* Pool Follow-Ups — Pool contacts with manual follow-up due today */}
-          {poolFollowUps.length > 0 && (
-            <div style={{ marginTop: 28 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#a855f7", boxShadow: "0 0 8px #a855f7" }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#a855f7", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Pool — Follow-Ups Due
-                </span>
-                <span style={{ background: "#a855f722", color: "#c084fc", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
-                  {poolFollowUps.length}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {poolFollowUps.map((c) => (
-                  <div key={c.id} style={{
-                    background: "#1a1a1a", borderRadius: 14,
-                    border: "1px solid #a855f733", padding: "14px 16px",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{c.name}</span>
-                      <span style={{ fontSize: 11, color: "#a855f7", fontWeight: 600, background: "#a855f722", borderRadius: 20, padding: "2px 8px" }}>Pool</span>
-                    </div>
-                    {c.brokerage && <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>🏢 {c.brokerage}</div>}
-                    {c.assignedTo && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6 }}>👤 {c.assignedTo}</div>}
-                    <div style={{ fontSize: 12, fontWeight: 600, color: c.followUpDate! < todayStr ? "#ef4444" : "#facc15", marginBottom: 10 }}>
-                      {c.followUpDate! < todayStr ? "⚠️ Overdue: " : "📅 Due: "}{c.followUpDate}
-                    </div>
-                    {c.lastReply && (
-                      <div style={{ fontSize: 12, color: "#555", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4 }}>
-                        &ldquo;{c.lastReply.replace(/^\[.*?\]\s*/, "")}&rdquo;
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <a
-                        href={`sms:${c.phone}`}
-                        style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, background: "#a855f722", color: "#c084fc", border: "1px solid #a855f744", textDecoration: "none", fontWeight: 600 }}
-                      >
-                        💬 Message
-                      </a>
-                      <button
-                        onClick={() => handleStatusChange(c.id, "Potential Deal")}
-                        style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, background: "#10b98122", color: "#34d399", border: "1px solid #10b98144", cursor: "pointer", fontWeight: 600 }}
-                      >
-                        Potential Deal
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           </>
         )}
       </div>

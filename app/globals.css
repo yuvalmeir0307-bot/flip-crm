@@ -91,9 +91,11 @@ select option { background: #1a1a1a; }
 }
 .opportunities-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
+  grid-template-columns: repeat(4, minmax(280px, 1fr));
+  gap: 20px;
   align-items: start;
+  overflow-x: auto;
+  padding-bottom: 8px;
 }
 
 /* ── Mobile breakpoint ── */
