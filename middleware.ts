@@ -12,6 +12,8 @@ const PUBLIC_PATHS = [
   "/api/qa-logs",
   "/api/qa-run",
   "/api/setup-logs",
+  "/api/sync-all-contacts",
+  "/api/agent-verify",
 ];
 
 export async function middleware(req: NextRequest) {
