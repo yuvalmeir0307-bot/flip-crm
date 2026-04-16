@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   "/api/setup-logs",
   "/api/sync-all-contacts",
   "/api/agent-verify",
+  "/api/debug-openphone",
 ];
 
 export async function middleware(req: NextRequest) {
